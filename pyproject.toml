@@ -55,10 +55,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/tastytrade/tastytrade-mcp"
-Documentation = "https://github.com/tastytrade/tastytrade-mcp/blob/main/README.md"
-Repository = "https://github.com/tastytrade/tastytrade-mcp"
-Issues = "https://github.com/tastytrade/tastytrade-mcp/issues"
+Homepage = "https://github.com/bostrovsky/tastytrade_MCP_Server"
+Documentation = "https://github.com/bostrovsky/tastytrade_MCP_Server/blob/main/README.md"
+Repository = "https://github.com/bostrovsky/tastytrade_MCP_Server"
+Issues = "https://github.com/bostrovsky/tastytrade_MCP_Server/issues"
 
 [project.scripts]
 tastytrade-mcp = "tastytrade_mcp.cli:main"
