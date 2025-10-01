@@ -1,0 +1,254 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+poetry.toml
+
+# pdm
+.pdm.toml
+.pdm-python
+.pdm-build/
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Project specific
+*.db
+*.sqlite
+*.sqlite3
+logs/
+temp/
+tmp/
+
+# SECURITY: Credential and secret files - NEVER commit these!
+# Environment files with credentials
+.env*
+*.env
+.env.local
+.env.production
+.env.staging
+.env.development
+.env.backup
+
+# OAuth and API credentials
+*oauth*token*
+*refresh*token*
+*client*secret*
+*api*key*
+*credentials*
+client_secrets.json
+service-account*.json
+
+# TastyTrade specific
+.tastytrade_session
+tastytrade_config.json
+*.tastytrade
+
+# SSH keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+id_rsa*
+id_ed25519*
+*.pub
+
+# Backup files that may contain sensitive data
+*.backup
+*.bak
+*_backup*
+.oauth_tokens_backup.txt
+
+# Database backups and dumps
+*.sql
+*.dump
+backups/
+migrations_backup/
+
+# User-specific files that may contain credentials
+.user_config
+.personal_settings
+user_credentials*
+
+# Test files with credentials (root level only - keep scripts/ folder tests)
+/test_*.py
+/security_cleanup.py
+/baseline_*.py
+/baseline_*.json
+/baseline_*.txt
+/compare_*.py
+/extract_*.py
+/replace_*.py
+/complete_*.py
+
+# Development backup files
+*_BACKUP.py
+*_backup.py
+*_BROKEN_*.py
+*_WORKING.py
+*_clean.py
+*_original.py
+*_monolithic_*.py
+*_modular.py
+*.py.bak
+*.py.backup
+
+# Cleanup script
+cleanup_repository.py
+oauth_handler.py
+
+# Database files (NEVER include user data)
+*.db
+*.sqlite
+*.sqlite3
+database.db
+tastytrade.db
+mcp.db
+tokens.db
+user_data.db
+
+# Database directories with user data
+data/
+db_data/
+user_databases/
+
+# Any file containing actual user tokens or credentials
+*_tokens_*
+user_credentials.json
+actual_tokens.json

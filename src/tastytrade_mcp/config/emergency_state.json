@@ -1,0 +1,38 @@
+{
+  "trading_halted": true,
+  "panic_mode": false,
+  "circuit_breakers": [
+    {
+      "id": 1,
+      "type": "loss_limit",
+      "threshold": 0,
+      "action": "halt",
+      "created": "2025-09-29T19:48:49.257635",
+      "triggered": false
+    },
+    {
+      "id": 2,
+      "type": "loss_limit",
+      "threshold": 1000,
+      "action": "halt",
+      "created": "2025-09-29T21:05:21.959493",
+      "triggered": false
+    },
+    {
+      "id": 3,
+      "type": "loss_limit",
+      "threshold": 1000,
+      "action": "halt_all",
+      "created": "2025-09-29T21:05:21.960225",
+      "triggered": false
+    }
+  ],
+  "emergency_history": [
+    {
+      "type": "halt_trading",
+      "timestamp": "2025-09-29T19:48:49.239477",
+      "reason": "Test halt with persistence"
+    }
+  ],
+  "last_updated": "2025-09-29T21:05:21.960250"
+}
