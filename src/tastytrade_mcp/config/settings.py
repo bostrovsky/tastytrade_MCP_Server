@@ -17,6 +17,7 @@ class Settings:
     # Environment
     use_production: bool = False
     use_database_mode: bool = False
+    debug: bool = False
 
     # Server
     server_name: str = "tastytrade-mcp"
@@ -34,6 +35,7 @@ class Settings:
             refresh_token=os.getenv("TASTYTRADE_REFRESH_TOKEN"),
             use_production=os.getenv("TASTYTRADE_USE_PRODUCTION", "false").lower() == "true",
             use_database_mode=os.getenv("TASTYTRADE_USE_DATABASE", "false").lower() == "true",
+            debug=os.getenv("DEBUG", "false").lower() == "true",
             database_url=os.getenv("DATABASE_URL"),
         )
 
