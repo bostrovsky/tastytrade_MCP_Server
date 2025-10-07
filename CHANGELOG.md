@@ -5,6 +5,18 @@ All notable changes to the TastyTrade MCP Server will be documented in this file
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.4] - 2024-10-07
+
+### Fixed
+- **Critical**: Fixed DATABASE_URL initialization causing `'NoneType is not iterable'` error during OAuth setup
+- Set DATABASE_URL environment variable before init_database() call in CLI
+- Added fallback default for DATABASE_URL in engine.py to prevent initialization failures
+
+### Impact
+- Database mode OAuth2 setup now initializes successfully
+- Automatic fallback to SQLite prevents configuration errors
+- Users can complete setup without manual DATABASE_URL configuration
+
 ## [1.0.3] - 2024-10-07
 
 ### Fixed
