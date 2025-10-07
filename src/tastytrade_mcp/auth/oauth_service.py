@@ -15,7 +15,7 @@ from tastytrade_mcp.auth.oauth_config import (
     get_oauth_config,
     validate_redirect_uri,
 )
-from tastytrade_mcp.db.session import get_session
+from tastytrade_mcp.db.session import get_session_context
 from tastytrade_mcp.models.auth import BrokerLink, BrokerSecret, LinkStatus, OAuthState
 from tastytrade_mcp.models.user import User
 from tastytrade_mcp.services.encryption import get_encryption_service
@@ -385,5 +385,5 @@ class OAuthService:
 
 async def get_oauth_service() -> OAuthService:
     """Get OAuth service instance."""
-    async with get_session() as session:
+    async with get_session_context() as session:
         return OAuthService(session)

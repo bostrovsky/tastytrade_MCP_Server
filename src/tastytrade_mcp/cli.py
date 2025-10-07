@@ -33,7 +33,7 @@ from tastytrade_mcp.config.settings import get_settings
 from tastytrade_mcp.db.setup import setup_database_mode, check_database_health
 from tastytrade_mcp.services.oauth_client import OAuthHTTPClient
 from tastytrade_mcp.auth.oauth_service import OAuthService
-from tastytrade_mcp.db.session import get_session, init_database
+from tastytrade_mcp.db.session import get_session_context, init_database
 from tastytrade_mcp.models.user import User
 from tastytrade_mcp.services.encryption import get_encryption_service
 
@@ -232,7 +232,7 @@ async def run_oauth_flow(client_id: str, client_secret: str, is_production: bool
         os.environ['OAUTH_CLIENT_SECRET'] = client_secret
 
         # Create OAuth service
-        async with get_session() as session:
+        async with get_session_context() as session:
             oauth_service = OAuthService(session)
 
             # Generate authorization URL

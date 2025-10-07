@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tastytrade-mcp"
-version = "1.0.2"
+version = "1.0.3"
 description = "TastyTrade MCP Server - Multi-LLM trading interface with unified deployment"
 readme = "README.md"
 license = {text = "MIT"}
