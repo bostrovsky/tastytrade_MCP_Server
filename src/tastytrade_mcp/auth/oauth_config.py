@@ -6,8 +6,6 @@ from urllib.parse import urlencode, urlparse
 
 from tastytrade_mcp.config.settings import get_settings
 
-settings = get_settings()
-
 
 @dataclass
 class OAuthConfig:
@@ -40,7 +38,10 @@ class OAuthConfig:
 
 def get_oauth_config() -> OAuthConfig:
     """Get OAuth configuration based on environment."""
-    
+
+    # Get fresh settings (not cached at module level)
+    settings = get_settings()
+
     # Determine base URLs
     if settings.use_sandbox:
         base_url = "https://sandbox.api.tastyworks.com"
