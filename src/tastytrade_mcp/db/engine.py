@@ -16,11 +16,15 @@ _async_session_factory = None
 def get_engine():
     """Get or create the database engine."""
     global _engine
-    
+
     if _engine is None:
         settings = get_settings()
         database_url = settings.database_url
-        
+
+        # Default to SQLite if no DATABASE_URL is set
+        if not database_url:
+            database_url = "sqlite+aiosqlite:///./tastytrade_mcp.db"
+
         # Determine if we're using SQLite or PostgreSQL
         is_sqlite = "sqlite" in database_url
         

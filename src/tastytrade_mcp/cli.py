@@ -217,6 +217,13 @@ async def run_oauth_flow(client_id: str, client_secret: str, is_production: bool
     try:
         console.print(f"\n[blue]🔐 Starting OAuth2 authorization flow...[/blue]")
 
+        # Set up environment variables BEFORE database initialization
+        os.environ['TASTYTRADE_USE_PRODUCTION'] = 'true' if is_production else 'false'
+        os.environ['TASTYTRADE_USE_DATABASE_MODE'] = 'true'
+        os.environ['OAUTH_CLIENT_ID'] = client_id
+        os.environ['OAUTH_CLIENT_SECRET'] = client_secret
+        os.environ['DATABASE_URL'] = 'sqlite+aiosqlite:///./tastytrade_mcp.db'
+
         # Initialize database if needed
         try:
             await init_database()
@@ -225,11 +232,6 @@ async def run_oauth_flow(client_id: str, client_secret: str, is_production: bool
 
         # Create temporary user for OAuth flow
         temp_user_id = uuid4()
-
-        # Set up OAuth service with production mode
-        os.environ['TASTYTRADE_USE_PRODUCTION'] = 'true' if is_production else 'false'
-        os.environ['OAUTH_CLIENT_ID'] = client_id
-        os.environ['OAUTH_CLIENT_SECRET'] = client_secret
 
         # Create OAuth service
         async with get_session_context() as session:
