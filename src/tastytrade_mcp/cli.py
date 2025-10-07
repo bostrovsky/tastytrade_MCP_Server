@@ -225,6 +225,10 @@ async def run_oauth_flow(client_id: str, client_secret: str, is_production: bool
         os.environ['OAUTH_CLIENT_SECRET'] = client_secret
         os.environ['DATABASE_URL'] = 'sqlite+aiosqlite:///./tastytrade_mcp.db'
 
+        # Force reload settings to pick up new environment variables
+        from tastytrade_mcp.config import settings as settings_module
+        settings_module._settings = None  # Clear cached settings
+
         # Initialize database if needed (create tables)
         try:
             await init_db()
