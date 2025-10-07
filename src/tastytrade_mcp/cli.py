@@ -221,8 +221,8 @@ async def run_oauth_flow(client_id: str, client_secret: str, is_production: bool
         # Set up environment variables BEFORE database initialization
         os.environ['TASTYTRADE_USE_PRODUCTION'] = 'true' if is_production else 'false'
         os.environ['TASTYTRADE_USE_DATABASE_MODE'] = 'true'
-        os.environ['OAUTH_CLIENT_ID'] = client_id
-        os.environ['OAUTH_CLIENT_SECRET'] = client_secret
+        os.environ['TASTYTRADE_CLIENT_ID'] = client_id
+        os.environ['TASTYTRADE_CLIENT_SECRET'] = client_secret
         os.environ['DATABASE_URL'] = 'sqlite+aiosqlite:///./tastytrade_mcp.db'
 
         # Force reload settings to pick up new environment variables
