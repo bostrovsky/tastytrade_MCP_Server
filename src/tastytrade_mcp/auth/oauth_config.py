@@ -120,18 +120,21 @@ def build_authorization_url(
 def validate_redirect_uri(uri: str) -> bool:
     """
     Validate that a redirect URI is allowed.
-    
+
     Args:
         uri: Redirect URI to validate
-    
+
     Returns:
         True if valid, False otherwise
     """
+    # Get fresh settings
+    settings = get_settings()
+
     # Parse URIs
     provided = urlparse(uri)
     config = get_oauth_config()
     allowed = urlparse(config.redirect_uri)
-    
+
     # In development, allow localhost with any port
     if settings.environment == "development":
         if provided.hostname in ["localhost", "127.0.0.1"]:
