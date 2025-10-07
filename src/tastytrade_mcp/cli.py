@@ -33,7 +33,8 @@ from tastytrade_mcp.config.settings import get_settings
 from tastytrade_mcp.db.setup import setup_database_mode, check_database_health
 from tastytrade_mcp.services.oauth_client import OAuthHTTPClient
 from tastytrade_mcp.auth.oauth_service import OAuthService
-from tastytrade_mcp.db.session import get_session_context, init_database
+from tastytrade_mcp.db.session import get_session_context
+from tastytrade_mcp.db.engine import init_db
 from tastytrade_mcp.models.user import User
 from tastytrade_mcp.services.encryption import get_encryption_service
 
@@ -224,9 +225,9 @@ async def run_oauth_flow(client_id: str, client_secret: str, is_production: bool
         os.environ['OAUTH_CLIENT_SECRET'] = client_secret
         os.environ['DATABASE_URL'] = 'sqlite+aiosqlite:///./tastytrade_mcp.db'
 
-        # Initialize database if needed
+        # Initialize database if needed (create tables)
         try:
-            await init_database()
+            await init_db()
         except Exception as db_error:
             console.print(f"[yellow]Warning: Database initialization issue: {db_error}[/yellow]")
 
