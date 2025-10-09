@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tastytrade-mcp"
-version = "1.4.0"
+version = "1.4.2"
 description = "TastyTrade MCP Server - Production-ready OAuth trading with full instrument support"
 readme = "README.md"
 license = {text = "MIT"}
@@ -37,6 +37,7 @@ dependencies = [
     "mcp>=1.0.0",
     "cryptography>=41.0.0",
     "sqlalchemy>=2.0.0",
+    "greenlet>=2.0.0",
     "aiosqlite>=0.19.0",
     "alembic>=1.12.0",
     "typer>=0.9.0",

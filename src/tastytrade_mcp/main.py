@@ -595,7 +595,7 @@ async def handle_list_tools() -> list[types.Tool]:
                     "dry_run": {
                         "type": "boolean",
                         "description": "Preview order without executing (default: true for safety)",
-                        "default": true
+                        "default": True
                     }
                 },
                 "required": ["account_number", "legs"]
