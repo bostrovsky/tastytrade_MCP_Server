@@ -290,7 +290,7 @@ class WebSocketQuoteService:
         if self.websocket:
             try:
                 await self.websocket.close()
-            except:
+            except Exception:
                 pass
         self.is_connected = False
         self.is_authenticated = False

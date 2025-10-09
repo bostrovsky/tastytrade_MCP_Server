@@ -41,11 +41,9 @@ from tastytrade_mcp.handlers import (
     handle_search_symbols,
     handle_search_symbols_advanced,
     handle_get_quotes,
-    # handle_get_historical_data,  # REMOVED: Fake tool - API doesn't exist
     handle_get_options_chain,
     # Trading handlers: Environment-based routing (OAuth for production, SDK for sandbox)
     handle_get_positions,
-    # handle_get_positions_with_greeks,  # REMOVED: Fake tool - Greeks don't exist in API
     handle_analyze_portfolio,
     handle_monitor_position_alerts,
     handle_suggest_rebalancing,
@@ -71,15 +69,6 @@ from tastytrade_mcp.handlers.shortcuts import (
     handle_test_shortcut,
     handle_delete_shortcut,
 )
-# REMOVED: Fake streaming tools - Mock WebSocket implementation
-# from tastytrade_mcp.handlers.streaming_oauth import (
-#     handle_subscribe_market_stream,
-#     handle_unsubscribe_market_stream,
-#     handle_get_stream_data,
-#     handle_get_stream_status,
-#     handle_get_stream_metrics,
-#     handle_shutdown_streams,
-# )
 from tastytrade_mcp.services.websocket import WebSocketManager
 
 # Configure logging to stderr only (stdout must be clean for MCP JSON-RPC)

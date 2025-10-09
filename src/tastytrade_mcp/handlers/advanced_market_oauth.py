@@ -328,37 +328,12 @@ async def handle_get_historical_data(arguments: dict[str, Any]) -> list[types.Te
             historical_data = data_response.get("data", [])
 
         except Exception as e:
-            logger.warning(f"Could not fetch historical data via OAuth: {e}")
-            # Generate placeholder historical data
-            historical_data = []
-            current_date = start_dt
-            base_price = 100.0
-
-            while current_date <= end_dt:
-                # Simple price simulation
-                open_price = base_price + (current_date.day % 5) - 2
-                high_price = open_price + 2
-                low_price = open_price - 1.5
-                close_price = open_price + ((current_date.day % 3) - 1)
-                volume = 1000000 + (current_date.day * 50000)
-
-                historical_data.append({
-                    'datetime': current_date.isoformat(),
-                    'timestamp': current_date.isoformat(),
-                    'open': round(open_price, 2),
-                    'high': round(high_price, 2),
-                    'low': round(low_price, 2),
-                    'close': round(close_price, 2),
-                    'volume': volume
-                })
-
-                # Move to next day
-                current_date += timedelta(days=1)
-                base_price = close_price  # Use previous close as next base
-
-                # Stop if we have enough data
-                if len(historical_data) >= 100:
-                    break
+            logger.error(f"Could not fetch historical data via OAuth: {e}")
+            await oauth_client.close()
+            return [types.TextContent(
+                type="text",
+                text=f"❌ Historical data is not available for {symbol}. The TastyTrade API endpoint may not support this feature yet. Error: {str(e)}"
+            )]
 
         # Format response
         formatted = await format_historical_data(historical_data, symbol, timeframe, format_type)
@@ -420,59 +395,12 @@ async def handle_get_options_chain(arguments: dict[str, Any]) -> list[types.Text
             chain_data = chain_response.get("data", {})
 
         except Exception as e:
-            logger.warning(f"Could not fetch options chain via OAuth: {e}")
-            # Create placeholder options chain structure
-            chain_data = {
-                "underlying_symbol": symbol,
-                "underlying_price": 150.0,  # Placeholder
-                "expirations": [
-                    {
-                        "expiration_date": "2024-12-20",
-                        "days_to_expiration": 30,
-                        "strikes": [
-                            {
-                                "strike_price": 145.0,
-                                "call": {
-                                    "bid": 7.50,
-                                    "ask": 7.75,
-                                    "last": 7.60,
-                                    "volume": 150,
-                                    "open_interest": 500,
-                                    "implied_volatility": 0.25
-                                },
-                                "put": {
-                                    "bid": 2.20,
-                                    "ask": 2.35,
-                                    "last": 2.30,
-                                    "volume": 75,
-                                    "open_interest": 300,
-                                    "implied_volatility": 0.24
-                                }
-                            },
-                            {
-                                "strike_price": 150.0,
-                                "call": {
-                                    "bid": 4.80,
-                                    "ask": 5.00,
-                                    "last": 4.90,
-                                    "volume": 200,
-                                    "open_interest": 800,
-                                    "implied_volatility": 0.23
-                                },
-                                "put": {
-                                    "bid": 4.60,
-                                    "ask": 4.80,
-                                    "last": 4.70,
-                                    "volume": 180,
-                                    "open_interest": 600,
-                                    "implied_volatility": 0.23
-                                }
-                            }
-                        ]
-                    }
-                ],
-                "note": "Placeholder data - requires TastyTrade options chain API"
-            }
+            logger.error(f"Could not fetch options chain via OAuth: {e}")
+            await oauth_client.close()
+            return [types.TextContent(
+                type="text",
+                text=f"❌ Options chain data is not available for {symbol}. The TastyTrade API endpoint may not support this feature yet. Error: {str(e)}"
+            )]
 
         # Format response
         formatted = await format_options_chain_response(chain_data, symbol, format_type)

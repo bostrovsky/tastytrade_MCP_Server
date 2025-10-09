@@ -177,7 +177,7 @@ async def handle_get_option_chain(arguments: dict[str, Any]) -> list[types.TextC
                                 dte = (exp_dt - datetime.now()).days
                                 if not (min_dte <= dte <= max_dte):
                                     continue
-                            except:
+                            except Exception:
                                 pass
 
                     # Process strikes for this expiration

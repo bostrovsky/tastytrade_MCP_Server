@@ -280,9 +280,9 @@ class OAuthHTTPClient:
             # Try to get error details from response body
             try:
                 error_body = response.json()
-                print(f"❌ HTTP {response.status_code} error body: {error_body}")
-            except:
-                print(f"❌ HTTP {response.status_code} error, no JSON body: {response.text}")
+                logger.error(f"❌ HTTP {response.status_code} error body: {error_body}")
+            except Exception:
+                logger.error(f"❌ HTTP {response.status_code} error, no JSON body: {response.text}")
             raise
         return response.json()
 

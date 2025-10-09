@@ -83,7 +83,7 @@ def save_shortcuts(shortcuts: Dict[str, Any]) -> bool:
         if 'temp_file' in locals() and temp_file.exists():
             try:
                 temp_file.unlink()
-            except:
+            except Exception:
                 pass
         return False
 
