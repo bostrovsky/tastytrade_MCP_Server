@@ -5,8 +5,16 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
-import redis.asyncio as redis
-from redis.asyncio import ConnectionError, RedisError
+# Redis is optional - only import if available
+try:
+    import redis.asyncio as redis
+    from redis.asyncio import ConnectionError, RedisError
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    # Define dummy types for type hints
+    ConnectionError = Exception  # type: ignore
+    RedisError = Exception  # type: ignore
 
 from tastytrade_mcp.config.settings import get_settings
 
@@ -87,8 +95,12 @@ class CacheService:
         """Initialize cache service."""
         if self._initialized:
             return
-        
-        if self._use_redis:
+
+        if self._use_redis and not REDIS_AVAILABLE:
+            logger.warning("Redis requested but redis package not installed, using in-memory cache")
+            self._use_redis = False
+
+        if self._use_redis and REDIS_AVAILABLE:
             try:
                 self._redis_client = await redis.from_url(
                     settings.redis_url,
@@ -105,7 +117,7 @@ class CacheService:
                 self._redis_client = None
         else:
             logger.info("Using in-memory cache (Redis disabled)")
-        
+
         self._initialized = True
     
     async def get(self, key: str) -> Optional[str]:

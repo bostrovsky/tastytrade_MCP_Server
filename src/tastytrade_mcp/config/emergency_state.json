@@ -25,6 +25,22 @@
       "action": "halt_all",
       "created": "2025-09-29T21:05:21.960225",
       "triggered": false
+    },
+    {
+      "id": 4,
+      "type": "loss_limit",
+      "threshold": 0,
+      "action": "halt",
+      "created": "2025-10-08T14:20:39.232992",
+      "triggered": false
+    },
+    {
+      "id": 5,
+      "type": "loss_limit",
+      "threshold": 0,
+      "action": "halt",
+      "created": "2025-10-08T14:20:54.947481",
+      "triggered": false
     }
   ],
   "emergency_history": [
@@ -32,7 +48,17 @@
       "type": "halt_trading",
       "timestamp": "2025-09-29T19:48:49.239477",
       "reason": "Test halt with persistence"
+    },
+    {
+      "type": "halt_trading",
+      "timestamp": "2025-10-08T14:20:39.232229",
+      "reason": "Test halt for safe tool testing"
+    },
+    {
+      "type": "halt_trading",
+      "timestamp": "2025-10-08T14:20:54.946915",
+      "reason": "Test halt for safe tool testing"
     }
   ],
-  "last_updated": "2025-09-29T21:05:21.960250"
+  "last_updated": "2025-10-08T14:20:54.947502"
 }

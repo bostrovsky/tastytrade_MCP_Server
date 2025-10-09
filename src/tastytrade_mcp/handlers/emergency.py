@@ -3,7 +3,7 @@ from typing import Any
 import mcp.types as types
 from tastytrade import Account
 
-from tastytrade_mcp.handlers.handler_adapter import HandlerAdapter
+from tastytrade_mcp.services.simple_session import get_tastytrade_session
 from tastytrade_mcp.config.settings import get_settings
 from tastytrade_mcp.utils.logging import get_logger
 from tastytrade_mcp.services.emergency_logger import (
@@ -14,7 +14,6 @@ from tastytrade_mcp.services.emergency_logger import (
 
 logger = get_logger(__name__)
 settings = get_settings()
-adapter = HandlerAdapter(use_database=settings.use_database_mode)
 emergency_logger = EmergencyLogger(use_database=settings.use_database_mode)
 
 
@@ -42,10 +41,13 @@ async def handle_panic_button(arguments: dict[str, Any]) -> list[types.TextConte
     )
 
     try:
-        session = await adapter.get_session(user_id)
+        session = get_tastytrade_session()
 
         if not account_number:
-            account_number = await adapter.get_account_number(user_id)
+            # Get first account if not specified
+            accounts = Account.get(session)
+            if accounts:
+                account_number = accounts[0].account_number
 
         # Get account to work with
         accounts = Account.get(session)
@@ -132,10 +134,13 @@ async def handle_emergency_exit(arguments: dict[str, Any]) -> list[types.TextCon
     )
 
     try:
-        session = await adapter.get_session(user_id)
+        session = get_tastytrade_session()
 
         if not account_number:
-            account_number = await adapter.get_account_number(user_id)
+            # Get first account if not specified
+            accounts = Account.get(session)
+            if accounts:
+                account_number = accounts[0].account_number
 
         # Get account to work with
         accounts = Account.get(session)
@@ -327,7 +332,14 @@ async def handle_halt_trading(arguments: dict[str, Any]) -> list[types.TextConte
 
     try:
         if not account_number:
-            account_number = await adapter.get_account_number(user_id)
+            # Get first account if not specified
+            try:
+                session = get_tastytrade_session()
+                accounts = Account.get(session)
+                if accounts:
+                    account_number = accounts[0].account_number
+            except Exception:
+                account_number = "[Account unavailable]"
 
         # In simple mode, we can't persist halt state
         if not settings.use_database_mode:
@@ -372,7 +384,10 @@ async def handle_resume_trading(arguments: dict[str, Any]) -> list[types.TextCon
         # Try to get account number if not provided, but handle failure gracefully
         if not account_number:
             try:
-                account_number = await adapter.get_account_number(user_id)
+                session = get_tastytrade_session()
+                accounts = Account.get(session)
+                if accounts:
+                    account_number = accounts[0].account_number
             except Exception:
                 account_number = "[Account unavailable]"
 
@@ -449,7 +464,7 @@ async def handle_emergency_stop_all(arguments: dict[str, Any]) -> list[types.Tex
     )
 
     try:
-        session = await adapter.get_session(user_id)
+        session = get_tastytrade_session()
 
         # Get all accounts
         accounts = Account.get(session)

@@ -8,13 +8,12 @@ from pathlib import Path
 import mcp.types as types
 from tastytrade import Account
 
-from tastytrade_mcp.handlers.handler_adapter import HandlerAdapter
+from tastytrade_mcp.services.simple_session import get_tastytrade_session
 from tastytrade_mcp.config.settings import get_settings
 from tastytrade_mcp.utils.logging import get_logger
 
 logger = get_logger(__name__)
 settings = get_settings()
-adapter = HandlerAdapter(use_database=settings.use_database_mode)
 
 # Cache file for market values
 CACHE_FILE = Path.home() / '.tastytrade_mcp' / 'market_values_cache.json'
@@ -79,10 +78,13 @@ async def handle_get_positions(arguments: dict[str, Any]) -> list[types.TextCont
     format_type = arguments.get("format", "text")
 
     try:
-        session = await adapter.get_session(user_id)
+        session = get_tastytrade_session()
 
         if not account_number:
-            account_number = await adapter.get_account_number(user_id)
+            # Get first account if not specified
+            accounts = Account.get(session)
+            if accounts:
+                account_number = accounts[0].account_number
 
         accounts = Account.get(session)
         target_account = None
@@ -218,10 +220,13 @@ async def handle_get_positions_with_greeks(arguments: dict[str, Any]) -> list[ty
     account_number = arguments.get("account_number")
 
     try:
-        session = await adapter.get_session(user_id)
+        session = get_tastytrade_session()
 
         if not account_number:
-            account_number = await adapter.get_account_number(user_id)
+            # Get first account if not specified
+            accounts = Account.get(session)
+            if accounts:
+                account_number = accounts[0].account_number
 
         accounts = Account.get(session)
         target_account = None
@@ -337,10 +342,13 @@ async def handle_analyze_portfolio(arguments: dict[str, Any]) -> list[types.Text
     account_number = arguments.get("account_number")
 
     try:
-        session = await adapter.get_session(user_id)
+        session = get_tastytrade_session()
 
         if not account_number:
-            account_number = await adapter.get_account_number(user_id)
+            # Get first account if not specified
+            accounts = Account.get(session)
+            if accounts:
+                account_number = accounts[0].account_number
 
         accounts = Account.get(session)
         target_account = None
@@ -440,10 +448,13 @@ async def handle_analyze_position_correlation(arguments: dict[str, Any]) -> list
     lookback_days = arguments.get("lookback_days", 30)
 
     try:
-        session = await adapter.get_session(user_id)
+        session = get_tastytrade_session()
 
         if not account_number:
-            account_number = await adapter.get_account_number(user_id)
+            # Get first account if not specified
+            accounts = Account.get(session)
+            if accounts:
+                account_number = accounts[0].account_number
 
         accounts = Account.get(session)
         target_account = None
@@ -533,10 +544,13 @@ async def handle_monitor_position_alerts(arguments: dict[str, Any]) -> list[type
     alert_rules = arguments.get("alert_rules", [])
 
     try:
-        session = await adapter.get_session(user_id)
+        session = get_tastytrade_session()
 
         if not account_number:
-            account_number = await adapter.get_account_number(user_id)
+            # Get first account if not specified
+            accounts = Account.get(session)
+            if accounts:
+                account_number = accounts[0].account_number
 
         accounts = Account.get(session)
         target_account = None

@@ -27,7 +27,7 @@ class OAuthConfig:
     grant_type: str = "authorization_code"
     
     # Security
-    use_pkce: bool = True
+    use_pkce: bool = False  # Not used in personal grant flow
     state_ttl_seconds: int = 600  # 10 minutes
     
     @property
@@ -43,12 +43,12 @@ def get_oauth_config() -> OAuthConfig:
     settings = get_settings()
 
     # Determine base URLs
+    # OAuth token endpoints use api.tastyworks.com (per official TastyTrade docs)
+    # Personal grant flow - no browser authorization needed
     if settings.use_sandbox:
-        base_url = "https://sandbox.api.tastyworks.com"
-        oauth_base = "https://sandbox.api.tastyworks.com"
+        token_base = "https://api.cert.tastyworks.com"
     else:
-        base_url = "https://api.tastyworks.com"
-        oauth_base = "https://api.tastyworks.com"
+        token_base = "https://api.tastyworks.com"
     
     # Get client credentials from environment
     client_id = os.getenv("TASTYTRADE_CLIENT_ID", "")
@@ -60,21 +60,13 @@ def get_oauth_config() -> OAuthConfig:
         "http://localhost:8000/auth/oauth/callback"
     )
     
-    # Define scopes
-    scope = " ".join([
-        "account:read",
-        "account:write",
-        "market-data:read",
-        "orders:read",
-        "orders:write",
-        "positions:read",
-        "balances:read",
-    ])
-    
+    # Define scopes (per TastyTrade OAuth docs: read, trade, openid)
+    scope = "read trade"
+
     return OAuthConfig(
-        authorize_url=f"{oauth_base}/oauth/authorize",
-        token_url=f"{oauth_base}/oauth/token",
-        revoke_url=f"{oauth_base}/oauth/revoke",
+        authorize_url="",  # Not used in personal grant flow
+        token_url=f"{token_base}/oauth/token",
+        revoke_url=f"{token_base}/oauth/revoke",
         client_id=client_id,
         client_secret=client_secret,
         redirect_uri=redirect_uri,

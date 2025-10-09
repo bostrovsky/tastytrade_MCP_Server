@@ -18,8 +18,8 @@ TOOL_CATEGORIES = {
     "market_data": {
         "icon": "📈",
         "title": "MARKET DATA",
-        "tools": ["search_symbols", "search_symbols_advanced", "get_quotes",
-                 "get_historical_data", "get_options_chain", "scan_opportunities"]
+        "tools": ["search_symbols", "search_symbols_advanced", "get_quotes", "get_realtime_quotes",
+                 "get_options_chain", "find_options_by_delta", "stream_option_quotes"]
     },
     "trading": {
         "icon": "💼",
@@ -30,9 +30,7 @@ TOOL_CATEGORIES = {
     "positions": {
         "icon": "🎯",
         "title": "POSITION ANALYSIS",
-        "tools": ["get_positions_with_greeks", "analyze_portfolio", "monitor_position_alerts",
-                 "analyze_position_correlation", "bulk_position_update", "analyze_options_strategy",
-                 "suggest_rebalancing"]
+        "tools": ["analyze_portfolio", "monitor_position_alerts", "suggest_rebalancing"]
     },
     "emergency": {
         "icon": "🚨",
@@ -40,12 +38,6 @@ TOOL_CATEGORIES = {
         "tools": ["panic_button", "emergency_exit", "halt_trading", "resume_trading",
                  "emergency_stop_all", "create_circuit_breaker", "check_emergency_conditions",
                  "get_emergency_history"]
-    },
-    "streaming": {
-        "icon": "🔍",
-        "title": "SCANNING & STREAMING",
-        "tools": ["subscribe_market_stream", "unsubscribe_market_stream", "get_stream_data",
-                 "get_stream_status", "get_stream_metrics", "shutdown_streams"]
     },
     "shortcuts": {
         "icon": "🔧",
@@ -56,7 +48,7 @@ TOOL_CATEGORIES = {
     "health": {
         "icon": "🏥",
         "title": "SYSTEM HEALTH",
-        "tools": ["health_check", "ping"]
+        "tools": ["health_check"]
     }
 }
 

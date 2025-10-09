@@ -128,8 +128,8 @@ class HandlerAdapter:
                 SELECT
                     bl.account_number,
                     bl.is_sandbox,
-                    bs.encrypted_access_token,
-                    bs.encrypted_refresh_token,
+                    bs.enc_access_token,
+                    bs.enc_refresh_token,
                     bs.access_expires_at,
                     bs.id as secret_id
                 FROM users u
@@ -145,8 +145,8 @@ class HandlerAdapter:
                 raise ValueError(f"No active broker link found for user_id: {user_id}")
 
             is_sandbox = user_data['is_sandbox']
-            encrypted_access_token = user_data['encrypted_access_token']
-            encrypted_refresh_token = user_data['encrypted_refresh_token']
+            encrypted_access_token = user_data['enc_access_token']
+            encrypted_refresh_token = user_data['enc_refresh_token']
             access_expires_at = user_data['access_expires_at']
             secret_id = user_data['secret_id']
 
@@ -203,8 +203,8 @@ class HandlerAdapter:
                         conn = await asyncpg.connect(database_url)
                         await conn.execute("""
                             UPDATE broker_secrets
-                            SET encrypted_access_token = $1,
-                                encrypted_refresh_token = $2,
+                            SET enc_access_token = $1,
+                                enc_refresh_token = $2,
                                 access_expires_at = $3
                             WHERE id = $4
                         """, encrypted_new_access, encrypted_new_refresh, new_expires_at, secret_id)

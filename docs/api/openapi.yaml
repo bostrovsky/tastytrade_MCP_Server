@@ -1,0 +1,631 @@
+openapi: 3.0.3
+info:
+  title: TastyTrade MCP Server API
+  description: |
+    Model Context Protocol server for TastyTrade API integration with comprehensive safety measures.
+    
+    ## Overview
+    This API provides a conversational interface to TastyTrade's trading platform with:
+    - OAuth2 authentication flow
+    - Two-step trade confirmation
+    - Real-time market data
+    - Portfolio management
+    - Risk controls
+    
+    ## Authentication
+    All endpoints except health checks require authentication via OAuth2.
+    Tokens are encrypted at rest and never exposed to LLM conversations.
+    
+    ## Safety Features
+    - Two-step confirmation for all trades
+    - Sandbox mode for testing
+    - Rate limiting
+    - Audit logging
+    - Position limits
+  version: 0.1.0
+  contact:
+    name: TastyTrade MCP Team
+    email: support@tastytrade-mcp.local
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: https://api.tastytrade-mcp.com
+    description: Production server
+  - url: https://sandbox.tastytrade-mcp.com
+    description: Sandbox environment
+
+tags:
+  - name: Health
+    description: Health check and monitoring endpoints
+  - name: Authentication
+    description: OAuth2 authentication flow
+  - name: Market Data
+    description: Real-time market data and quotes
+  - name: Trading
+    description: Order management and execution
+  - name: Account
+    description: Account information and positions
+  - name: WebSocket
+    description: Real-time data streaming
+
+paths:
+  # Health Check Endpoints
+  /health/:
+    get:
+      tags:
+        - Health
+      summary: Basic health check
+      description: Returns basic health status of the service
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              example:
+                status: healthy
+                timestamp: "2025-09-14T01:58:14.823582"
+                uptime_seconds: 17.630206
+                version: "0.1.0"
+                environment: development
+
+  /health/live:
+    get:
+      tags:
+        - Health
+      summary: Kubernetes liveness probe
+      description: Returns 200 if the service is alive
+      operationId: livenessProbe
+      responses:
+        '200':
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [alive]
+
+  /health/ready:
+    get:
+      tags:
+        - Health
+      summary: Kubernetes readiness probe
+      description: Returns 200 if the service is ready to accept traffic
+      operationId: readinessProbe
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ready]
+        '503':
+          description: Service not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /health/detailed:
+    get:
+      tags:
+        - Health
+      summary: Detailed health check
+      description: Returns detailed health status including all components
+      operationId: detailedHealthCheck
+      responses:
+        '200':
+          description: Detailed health information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailedHealth'
+
+  /health/metrics:
+    get:
+      tags:
+        - Health
+      summary: Metrics endpoint
+      description: Returns application metrics for monitoring
+      operationId: metrics
+      responses:
+        '200':
+          description: Application metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Metrics'
+
+  # Authentication Endpoints (Future)
+  /auth/oauth/initiate:
+    post:
+      tags:
+        - Authentication
+      summary: Initiate OAuth flow
+      description: Starts the OAuth2 authentication flow with TastyTrade
+      operationId: initiateOAuth
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OAuthInitiateRequest'
+      responses:
+        '200':
+          description: OAuth flow initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthInitiateResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/oauth/callback:
+    get:
+      tags:
+        - Authentication
+      summary: OAuth callback
+      description: Handles the OAuth2 callback from TastyTrade
+      operationId: oauthCallback
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Authorization code from TastyTrade
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+          description: State parameter for CSRF protection
+      responses:
+        '302':
+          description: Redirect to success or error page
+        '400':
+          description: Invalid callback parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/status:
+    get:
+      tags:
+        - Authentication
+      summary: Get authentication status
+      description: Returns current authentication status for the user
+      operationId: authStatus
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Authentication status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthStatus'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Market Data Endpoints (Future)
+  /market/search:
+    get:
+      tags:
+        - Market Data
+      summary: Search symbols
+      description: Search for tradeable symbols
+      operationId: searchSymbols
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SymbolSearchResults'
+
+  /market/quote/{symbol}:
+    get:
+      tags:
+        - Market Data
+      summary: Get quote
+      description: Get real-time quote for a symbol
+      operationId: getQuote
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Symbol to quote
+      responses:
+        '200':
+          description: Quote data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quote'
+
+  # Trading Endpoints (Future)
+  /trading/preview:
+    post:
+      tags:
+        - Trading
+      summary: Preview order
+      description: Preview an order before submission (step 1 of 2-step process)
+      operationId: previewOrder
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderRequest'
+      responses:
+        '200':
+          description: Order preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderPreview'
+
+  /trading/confirm:
+    post:
+      tags:
+        - Trading
+      summary: Confirm order
+      description: Confirm and submit a previewed order (step 2 of 2-step process)
+      operationId: confirmOrder
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderConfirmation'
+      responses:
+        '200':
+          description: Order submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from OAuth flow
+
+  schemas:
+    # Health Check Schemas
+    HealthStatus:
+      type: object
+      required:
+        - status
+        - timestamp
+        - uptime_seconds
+        - version
+        - environment
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+        uptime_seconds:
+          type: number
+        version:
+          type: string
+        environment:
+          type: string
+          enum: [development, staging, production, testing]
+
+    ComponentHealth:
+      type: object
+      required:
+        - name
+        - status
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy, error]
+        response_time_ms:
+          type: number
+        message:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    DetailedHealth:
+      allOf:
+        - $ref: '#/components/schemas/HealthStatus'
+        - type: object
+          required:
+            - components
+          properties:
+            components:
+              type: array
+              items:
+                $ref: '#/components/schemas/ComponentHealth'
+
+    Metrics:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        uptime_seconds:
+          type: number
+        version:
+          type: string
+        environment:
+          type: string
+        process:
+          type: object
+          properties:
+            memory_usage_mb:
+              type: number
+            cpu_percent:
+              type: number
+        application:
+          type: object
+          properties:
+            total_requests:
+              type: integer
+            active_connections:
+              type: integer
+            error_rate:
+              type: number
+
+    # Authentication Schemas
+    OAuthInitiateRequest:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        is_sandbox:
+          type: boolean
+          default: true
+        redirect_uri:
+          type: string
+          format: uri
+
+    OAuthInitiateResponse:
+      type: object
+      required:
+        - auth_url
+        - state
+      properties:
+        auth_url:
+          type: string
+          format: uri
+          description: URL to redirect user for authentication
+        state:
+          type: string
+          description: State parameter for CSRF protection
+        expires_at:
+          type: string
+          format: date-time
+
+    AuthStatus:
+      type: object
+      required:
+        - authenticated
+        - user_id
+      properties:
+        authenticated:
+          type: boolean
+        user_id:
+          type: string
+          format: uuid
+        broker_linked:
+          type: boolean
+        subscription_active:
+          type: boolean
+        accounts:
+          type: array
+          items:
+            type: string
+
+    # Market Data Schemas
+    SymbolSearchResults:
+      type: object
+      required:
+        - symbols
+      properties:
+        symbols:
+          type: array
+          items:
+            type: object
+            properties:
+              symbol:
+                type: string
+              description:
+                type: string
+              type:
+                type: string
+                enum: [equity, option, future, crypto]
+
+    Quote:
+      type: object
+      required:
+        - symbol
+        - bid
+        - ask
+        - last
+        - timestamp
+      properties:
+        symbol:
+          type: string
+        bid:
+          type: number
+        ask:
+          type: number
+        last:
+          type: number
+        volume:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+
+    # Trading Schemas
+    OrderRequest:
+      type: object
+      required:
+        - account_number
+        - symbol
+        - order_type
+        - side
+        - quantity
+      properties:
+        account_number:
+          type: string
+        symbol:
+          type: string
+        order_type:
+          type: string
+          enum: [market, limit, stop, stop_limit]
+        side:
+          type: string
+          enum: [buy, sell, buy_to_cover, sell_short]
+        quantity:
+          type: integer
+          minimum: 1
+        limit_price:
+          type: number
+        stop_price:
+          type: number
+        time_in_force:
+          type: string
+          enum: [day, gtc, ioc, fok]
+          default: day
+
+    OrderPreview:
+      type: object
+      required:
+        - preview_id
+        - order
+        - estimated_cost
+        - expires_at
+      properties:
+        preview_id:
+          type: string
+          format: uuid
+        order:
+          $ref: '#/components/schemas/OrderRequest'
+        estimated_cost:
+          type: number
+        commission:
+          type: number
+        margin_requirement:
+          type: number
+        expires_at:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+
+    OrderConfirmation:
+      type: object
+      required:
+        - preview_id
+        - confirm
+      properties:
+        preview_id:
+          type: string
+          format: uuid
+        confirm:
+          type: boolean
+          description: Must be true to submit order
+
+    OrderResponse:
+      type: object
+      required:
+        - order_id
+        - status
+        - submitted_at
+      properties:
+        order_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, filled, partially_filled, cancelled, rejected]
+        submitted_at:
+          type: string
+          format: date-time
+        filled_quantity:
+          type: integer
+        average_fill_price:
+          type: number
+
+    # Error Schema
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true

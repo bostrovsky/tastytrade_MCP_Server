@@ -1,13 +1,75 @@
 """Position handlers using OAuth client directly."""
 import os
-from typing import Any
+from typing import Any, List
 import mcp.types as types
 from tastytrade_mcp.services.oauth_client import OAuthHTTPClient
-from tastytrade_mcp.services.response_parser import ResponseParser
+from tastytrade_mcp.services.response_parser import ResponseParser, ParsedPosition
 from tastytrade_mcp.utils.logging import get_logger
 from tastytrade_mcp.handlers.utils_oauth import ensure_account_number, get_oauth_credentials
 
 logger = get_logger(__name__)
+
+
+async def enrich_positions_with_prices(positions: List[ParsedPosition]) -> List[ParsedPosition]:
+    """Fetch current prices and calculate market values for positions.
+
+    Args:
+        positions: List of ParsedPosition objects
+
+    Returns:
+        Same list with market_value and unrealized_pl updated
+    """
+    if not positions:
+        return positions
+
+    from tastytrade_mcp.handlers.realtime_quotes_oauth import handle_get_realtime_quotes
+    import json
+
+    # Get unique symbols
+    symbols = list(set([pos.symbol for pos in positions]))
+    logger.info(f"Enriching {len(positions)} positions with prices for {len(symbols)} symbols")
+
+    try:
+        # Fetch current prices via realtime quotes
+        quotes_result = await handle_get_realtime_quotes({
+            'symbols': ','.join(symbols),
+            'duration': 2,  # Quick 2-second stream
+            'format': 'json'
+        })
+
+        quotes_data = json.loads(quotes_result[0].text)
+
+        # Build price lookup dictionary
+        price_lookup = {}
+        for quote in quotes_data:
+            symbol = quote.get('symbol')
+            # Calculate mid price from bid/ask if not provided
+            mid_price = quote.get('mid')
+            if not mid_price:
+                bid = quote.get('bid')
+                ask = quote.get('ask')
+                if bid and ask:
+                    mid_price = (bid + ask) / 2
+
+            if symbol and mid_price:
+                price_lookup[symbol] = mid_price
+
+        logger.info(f"Successfully fetched prices for {len(price_lookup)} symbols")
+
+        # Update positions with calculated market values
+        for pos in positions:
+            current_price = price_lookup.get(pos.symbol)
+            if current_price:
+                # Calculate market value = quantity * current_price
+                pos.market_value = pos.quantity * current_price
+                # Calculate unrealized P/L = (current_price - avg_price) * quantity
+                pos.unrealized_pl = (current_price - pos.average_price) * pos.quantity
+
+    except Exception as e:
+        logger.warning(f"Could not fetch current prices for market value calculation: {e}")
+        # Continue with $0 market values if price fetch fails
+
+    return positions
 
 
 async def handle_get_positions(arguments: dict[str, Any]) -> list[types.TextContent]:
@@ -61,6 +123,9 @@ async def handle_get_positions(arguments: dict[str, Any]) -> list[types.TextCont
             # Get positions for the account
             positions_response = await client.get(f'/accounts/{account_number}/positions')
             positions = ResponseParser.parse_positions(positions_response)
+
+            # Enrich positions with current market prices
+            positions = await enrich_positions_with_prices(positions)
 
             if format_type == "json":
                 import json

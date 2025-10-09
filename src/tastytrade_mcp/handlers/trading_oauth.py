@@ -11,6 +11,161 @@ from tastytrade_mcp.handlers.utils_oauth import ensure_account_number, get_oauth
 logger = get_logger(__name__)
 
 
+async def handle_create_order(arguments: dict[str, Any]) -> list[types.TextContent]:
+    """Create an order for any instrument type (equity, options, futures, crypto) using OAuth.
+
+    Unified order handler that supports:
+    - Equity (stocks)
+    - Equity Options (calls/puts, single or multi-leg)
+    - Futures (/ES, /CL, etc.)
+    - Future Options
+    - Cryptocurrency (BTC/USD, etc.)
+
+    Args:
+        arguments: Dictionary containing:
+            - account_number: Account number (optional, uses first account if not provided)
+            - legs: List of order legs (required)
+                - instrument_type: Equity, Equity Option, Future, Future Option, Cryptocurrency
+                - symbol: Trading symbol
+                - quantity: Quantity to trade
+                - action: Buy to Open, Buy to Close, Sell to Open, Sell to Close
+            - order_type: Market, Limit, Stop, Stop Limit, Notional Market (default: Limit)
+            - time_in_force: Day, GTC, GTD, IOC, FOK (default: Day)
+            - price: Limit price (required for Limit orders)
+            - stop_trigger: Stop trigger price (required for Stop orders)
+            - price_effect: Debit or Credit (optional, auto-determined if not provided)
+            - dry_run: Preview without executing (default: true)
+
+    Returns:
+        List containing TextContent with order result
+    """
+    account_number = arguments.get("account_number")
+    legs = arguments.get("legs", [])
+    order_type = arguments.get("order_type", "Limit")
+    time_in_force = arguments.get("time_in_force", "Day")
+    price = arguments.get("price")
+    stop_trigger = arguments.get("stop_trigger")
+    price_effect = arguments.get("price_effect")
+    dry_run = arguments.get("dry_run", True)
+
+    # Validation
+    if not legs or len(legs) == 0:
+        return [types.TextContent(type="text", text="Error: at least one leg is required")]
+    if len(legs) > 4:
+        return [types.TextContent(type="text", text="Error: maximum 4 legs allowed")]
+
+    # Validate required fields for order types
+    if order_type in ["Limit", "Stop Limit"] and not price:
+        return [types.TextContent(type="text", text=f"Error: price is required for {order_type} orders")]
+    if order_type in ["Stop", "Stop Limit"] and not stop_trigger:
+        return [types.TextContent(type="text", text=f"Error: stop_trigger is required for {order_type} orders")]
+
+    try:
+        # Get OAuth credentials and create client
+        client_id, client_secret, refresh_token, use_production = await get_oauth_credentials()
+        client = OAuthHTTPClient(
+            client_id=client_id,
+            client_secret=client_secret,
+            refresh_token=refresh_token,
+            sandbox=not use_production
+        )
+
+        # Ensure we have an account number
+        account_number = await ensure_account_number(account_number)
+
+        # Build order JSON in TastyTrade API format
+        order_json = {
+            "time-in-force": time_in_force,
+            "order-type": order_type,
+            "legs": []
+        }
+
+        # Add price fields if provided (MUST be numbers, not strings)
+        if price:
+            order_json["price"] = float(price)
+        if stop_trigger:
+            order_json["stop-trigger"] = float(stop_trigger)
+
+        # Auto-determine price-effect if not provided
+        if not price_effect:
+            # Simple heuristic: Buy = Debit, Sell = Credit
+            first_action = legs[0].get("action", "")
+            if "Buy" in first_action:
+                price_effect = "Debit"
+            elif "Sell" in first_action:
+                price_effect = "Credit"
+
+        if price_effect:
+            order_json["price-effect"] = price_effect
+
+        # Convert legs to API format
+        for leg in legs:
+            # Quantity must be a number (int for most types, float for crypto)
+            instrument_type = leg["instrument_type"]
+            quantity = leg["quantity"]
+
+            # Cryptocurrency can have decimal quantities, others must be integers
+            if instrument_type == "Cryptocurrency":
+                numeric_quantity = float(quantity)
+            else:
+                numeric_quantity = int(float(quantity))  # Handle "1.0" -> 1
+
+            order_json["legs"].append({
+                "instrument-type": instrument_type,
+                "symbol": leg["symbol"],
+                "quantity": numeric_quantity,
+                "action": leg["action"]
+            })
+
+        # Submit order (dry-run or real)
+        if dry_run:
+            endpoint = f"/accounts/{account_number}/orders/dry-run"
+            result_prefix = "✅ DRY RUN - Order validated successfully!"
+            note = "\n\n⚠️  This was a DRY RUN. To execute, set dry_run=false"
+        else:
+            endpoint = f"/accounts/{account_number}/orders"
+            result_prefix = "✅ ORDER PLACED!"
+            note = ""
+
+        # Log the order JSON being sent
+        logger.info(f"Submitting order to {endpoint}: {json.dumps(order_json, indent=2)}")
+
+        response = await client.post(endpoint, json=order_json)
+
+        # Format response
+        result = f"{result_prefix}\n\n"
+        result += f"Order Details:\n"
+        result += f"  Account: {account_number}\n"
+        result += f"  Type: {order_type}\n"
+        result += f"  Time in Force: {time_in_force}\n"
+        if price:
+            result += f"  Price: ${price}\n"
+        if stop_trigger:
+            result += f"  Stop Trigger: ${stop_trigger}\n"
+        if price_effect:
+            result += f"  Price Effect: {price_effect}\n"
+
+        result += f"\nLegs:\n"
+        for i, leg in enumerate(legs, 1):
+            result += f"  {i}. {leg['action']} {leg['quantity']} {leg['instrument_type']} {leg['symbol']}\n"
+
+        result += note
+
+        # Add order ID if available in response
+        if isinstance(response, dict):
+            order_data = response.get("data", {})
+            if isinstance(order_data, dict):
+                order_id = order_data.get("order", {}).get("id")
+                if order_id:
+                    result += f"\n\nOrder ID: {order_id}"
+
+        return [types.TextContent(type="text", text=result)]
+
+    except Exception as e:
+        logger.error(f"Error creating order via OAuth: {e}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error creating order: {str(e)}")]
+
+
 async def handle_create_equity_order(arguments: dict[str, Any]) -> list[types.TextContent]:
     """Create an equity order.
 

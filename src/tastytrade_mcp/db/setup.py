@@ -18,10 +18,11 @@ from typing import Optional
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from tastytrade_mcp.db.engine import get_engine, get_db_session, init_db
+from tastytrade_mcp.db.engine import get_engine, init_db
+from tastytrade_mcp.db.session import get_session_context
 from tastytrade_mcp.db.base import Base
 from tastytrade_mcp.models.auth import BrokerLink, BrokerSecret, LinkStatus
-from tastytrade_mcp.models.user import User
+from tastytrade_mcp.models.user import User, UserStatus
 from tastytrade_mcp.services.encryption import EncryptionService
 
 logger = logging.getLogger(__name__)
@@ -87,13 +88,13 @@ async def seed_initial_user(
     """
     Seed the database with an initial user and encrypted OAuth tokens.
 
-    This is called during CLI setup when a user completes OAuth flow.
+    This is called during CLI setup when a user provides personal grant credentials.
 
     Args:
         user_id: Optional user ID (generates UUID if not provided)
-        refresh_token: OAuth refresh token to encrypt and store
-        client_id: OAuth client ID
-        client_secret: OAuth client secret
+        refresh_token: OAuth refresh token from personal grant
+        client_id: OAuth client ID (stored in env, not database)
+        client_secret: OAuth client secret (stored in env, not database)
         is_sandbox: Whether tokens are for sandbox environment
 
     Returns:
@@ -105,45 +106,28 @@ async def seed_initial_user(
 
         user_uuid = uuid.uuid4() if not user_id else uuid.UUID(user_id)
 
-        async with get_db_session() as session:
+        async with get_session_context() as session:
             # Create user
             user = User(
                 id=user_uuid,
                 email=f"user_{user_uuid.hex[:8]}@tastytrade-mcp.local",
-                is_active=True,
-                created_at=datetime.utcnow()
+                status=UserStatus.ACTIVE,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
             )
             session.add(user)
             await session.flush()
 
-            # Create broker link
-            broker_link = BrokerLink(
-                id=uuid.uuid4(),
+            # Use OAuthService to setup personal grant
+            # This will validate the refresh token and get initial access token
+            from tastytrade_mcp.auth.oauth_service import OAuthService
+
+            oauth_service = OAuthService(session)
+            broker_link = await oauth_service.setup_personal_grant(
                 user_id=user.id,
-                provider="tastytrade",
-                scope="read write trade",
-                status=LinkStatus.ACTIVE,
-                linked_at=datetime.utcnow()
+                refresh_token=refresh_token,
+                is_sandbox=is_sandbox
             )
-            session.add(broker_link)
-            await session.flush()
-
-            # Encrypt and store tokens
-            encryption_service = EncryptionService()
-
-            broker_secret = BrokerSecret(
-                id=uuid.uuid4(),
-                broker_link_id=broker_link.id,
-                enc_access_token=encryption_service.encrypt("pending"),  # Will be updated on first refresh
-                enc_refresh_token=encryption_service.encrypt(refresh_token),
-                access_expires_at=datetime.utcnow() + timedelta(hours=1),
-                refresh_expires_at=datetime.utcnow() + timedelta(days=30),
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
-            )
-            session.add(broker_secret)
-
-            await session.commit()
 
             logger.info(f"✓ Seeded initial user: {user.id}")
             return str(user.id)
@@ -221,7 +205,7 @@ async def cleanup_database() -> bool:
     try:
         logger.info("Cleaning up database (removing all user data)...")
 
-        async with get_db_session() as session:
+        async with get_session_context() as session:
             # Delete in correct order (respecting foreign keys)
             await session.execute(text("DELETE FROM broker_secrets"))
             await session.execute(text("DELETE FROM broker_links"))

@@ -22,22 +22,22 @@ def load_shortcuts() -> Dict[str, Any]:
         logger.info("No shortcuts file found, creating default")
         default_shortcuts = {
             "morning_update": {
-                "description": "Get morning portfolio status and market conditions",
+                "description": "Get morning portfolio status and positions",
                 "tools": [
                     {"name": "get_accounts", "args": {"user_id": "{{user_id}}"}},
                     {"name": "get_balances", "args": {"user_id": "{{user_id}}", "account_number": "{{account_number}}"}},
                     {"name": "get_positions", "args": {"user_id": "{{user_id}}", "account_number": "{{account_number}}"}},
-                    {"name": "scan_opportunities", "args": {"scan_type": "high_volume", "limit": 5}}
+                    {"name": "analyze_portfolio", "args": {"user_id": "{{user_id}}", "account_number": "{{account_number}}"}}
                 ],
                 "usage_count": 0,
                 "last_used": None
             },
-            "close_positions": {
-                "description": "Close all positions and halt trading",
+            "end_of_day": {
+                "description": "End of day summary with orders, positions, and alerts",
                 "tools": [
+                    {"name": "list_orders", "args": {"user_id": "{{user_id}}", "account_number": "{{account_number}}"}},
                     {"name": "get_positions", "args": {"user_id": "{{user_id}}", "account_number": "{{account_number}}"}},
-                    {"name": "emergency_exit", "args": {"user_id": "{{user_id}}", "account_number": "{{account_number}}"}},
-                    {"name": "halt_trading", "args": {"user_id": "{{user_id}}", "account_number": "{{account_number}}"}}
+                    {"name": "monitor_position_alerts", "args": {"account_number": "{{account_number}}"}}
                 ],
                 "usage_count": 0,
                 "last_used": None

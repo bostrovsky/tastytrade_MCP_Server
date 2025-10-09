@@ -12,14 +12,16 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from tastytrade_mcp.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
 class LocalEncryption:
     """Local encryption using Fernet (symmetric encryption)."""
-    
+
     def __init__(self, key: Optional[str] = None):
         """Initialize with encryption key."""
+        # Get settings at init time, not import time
+        settings = get_settings()
+
         if key:
             # Use provided key
             self._key = key.encode() if isinstance(key, str) else key
@@ -195,8 +197,9 @@ class EncryptionService:
         Used for values that need to be searchable but not reversible.
         """
         import hashlib
-        
+
         # Add salt from settings
+        settings = get_settings()
         salted = f"{settings.secret_key}:{value}"
         return hashlib.sha256(salted.encode()).hexdigest()
     

@@ -148,9 +148,23 @@ class OAuthHTTPClient:
         import os
         from pathlib import Path
 
-        env_path = Path.cwd() / '.env'
+        # Match the exact same search order as main.py uses for loading
+        # 1. Standard config directory (production/installed mode)
+        env_path = Path.home() / ".tastytrade-mcp" / ".env"
+
         if not env_path.exists():
-            logger.warning(".env file not found, cannot persist refresh token")
+            # 2. Project root (development mode)
+            # oauth_client.py is at: src/tastytrade_mcp/services/oauth_client.py
+            # So we need to go up 4 levels to reach project root
+            project_root = Path(__file__).parent.parent.parent.parent
+            env_path = project_root / '.env'
+
+        if not env_path.exists():
+            # 3. Current working directory (last resort)
+            env_path = Path.cwd() / '.env'
+
+        if not env_path.exists():
+            logger.warning(".env file not found in any standard location, cannot persist refresh token")
             return
 
         try:
@@ -260,7 +274,16 @@ class OAuthHTTPClient:
             httpx.HTTPStatusError: For non-2xx responses
         """
         response = await self.request("POST", endpoint, **kwargs)
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            # Try to get error details from response body
+            try:
+                error_body = response.json()
+                print(f"❌ HTTP {response.status_code} error body: {error_body}")
+            except:
+                print(f"❌ HTTP {response.status_code} error, no JSON body: {response.text}")
+            raise
         return response.json()
 
     async def put(self, endpoint: str, **kwargs) -> Dict[str, Any]:

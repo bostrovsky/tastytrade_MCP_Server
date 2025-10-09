@@ -679,13 +679,83 @@ async def handle_search_symbols_advanced(arguments: dict[str, Any]) -> list[type
                 elif isinstance(sym, dict):
                     symbols.append(sym)
 
-            # Apply filters if we have them
+            # Fetch real-time prices if we need price filtering
+            if min_price or max_price or symbols:
+                try:
+                    # Import the realtime quotes handler
+                    from tastytrade_mcp.handlers.realtime_quotes_oauth import handle_get_realtime_quotes
+
+                    # Get all symbols to fetch prices for
+                    symbols_to_price = [s['symbol'] for s in symbols]
+
+                    if symbols_to_price:
+                        # Fetch real-time quotes (2 second duration)
+                        quotes_result = await handle_get_realtime_quotes({
+                            'symbols': ','.join(symbols_to_price),
+                            'duration': 2,
+                            'format': 'json'
+                        })
+
+                        # Parse the JSON response
+                        import json
+                        if quotes_result and quotes_result[0].text:
+                            try:
+                                quotes_data = json.loads(quotes_result[0].text)
+                                quotes_map = {}
+
+                                # Build a map of symbol -> quote data
+                                for quote in quotes_data.get('quotes', []):
+                                    symbol = quote.get('symbol', '')
+                                    mid_price = quote.get('mid')
+                                    bid = quote.get('bid')
+                                    ask = quote.get('ask')
+
+                                    # Calculate mid price if not provided
+                                    if mid_price is None and bid and ask:
+                                        mid_price = (bid + ask) / 2
+
+                                    if mid_price:
+                                        quotes_map[symbol] = {
+                                            'current_price': mid_price,
+                                            'bid': bid,
+                                            'ask': ask
+                                        }
+
+                                # Update symbols with price data
+                                for sym_dict in symbols:
+                                    symbol = sym_dict['symbol']
+                                    if symbol in quotes_map:
+                                        sym_dict.update(quotes_map[symbol])
+
+                            except json.JSONDecodeError:
+                                logger.warning("Could not parse quotes JSON response")
+
+                except Exception as e:
+                    logger.warning(f"Could not fetch real-time prices: {e}")
+
+            # Apply filters now that we have price data
             filtered = []
             for sym_dict in symbols:
-                # Since we don't have price data from basic search, include all
+                current_price = sym_dict.get('current_price')
+
+                # Apply price filters
+                if min_price and (current_price is None or current_price < min_price):
+                    continue
+                if max_price and (current_price is None or current_price > max_price):
+                    continue
+
+                # Apply options filter
+                if options_enabled is not None and sym_dict.get('has_options') != options_enabled:
+                    continue
+
+                # Apply volume filter
+                if min_volume and sym_dict.get('volume', 0) < min_volume:
+                    continue
+
                 filtered.append(sym_dict)
                 if len(filtered) >= limit:
                     break
+
             symbols = filtered
 
         except Exception as e:

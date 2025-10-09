@@ -151,9 +151,22 @@ async def handle_suggest_rebalancing(arguments: dict[str, Any]) -> list[types.Te
 
         # Get current positions via OAuth API
         try:
-            # This would call the actual positions endpoint
+            from tastytrade_mcp.services.response_parser import ResponseParser
+            from tastytrade_mcp.handlers.positions_oauth import enrich_positions_with_prices
+
             positions_response = await oauth_client.get(f"/accounts/{account_number}/positions")
-            positions = positions_response.get("data", {}).get("items", [])
+            parsed_positions = ResponseParser.parse_positions(positions_response)
+            enriched_positions = await enrich_positions_with_prices(parsed_positions)
+
+            # Convert to dict format for compatibility
+            positions = [
+                {
+                    "instrument": {"symbol": p.symbol},
+                    "quantity": p.quantity,
+                    "market_value": p.market_value,
+                }
+                for p in enriched_positions
+            ]
         except Exception as e:
             logger.warning(f"Could not fetch positions via OAuth: {e}")
             positions = []
@@ -238,9 +251,25 @@ async def handle_analyze_portfolio(arguments: dict[str, Any]) -> list[types.Text
 
         # Get account data via OAuth API
         try:
-            # Get positions
+            # Get positions and enrich with current prices
+            from tastytrade_mcp.services.response_parser import ResponseParser
+            from tastytrade_mcp.handlers.positions_oauth import enrich_positions_with_prices
+
             positions_response = await oauth_client.get(f"/accounts/{account_number}/positions")
-            positions = positions_response.get("data", {}).get("items", [])
+            parsed_positions = ResponseParser.parse_positions(positions_response)
+            enriched_positions = await enrich_positions_with_prices(parsed_positions)
+
+            # Convert back to dict format for compatibility with existing code
+            positions = [
+                {
+                    "instrument": {"symbol": p.symbol, "instrument_type": p.instrument_type},
+                    "quantity": p.quantity,
+                    "market_value": p.market_value,
+                    "unrealized_day_gain": p.unrealized_pl,
+                    "underlying_symbol": p.underlying_symbol
+                }
+                for p in enriched_positions
+            ]
 
             # Get balances
             balances_response = await oauth_client.get(f"/accounts/{account_number}/balances")

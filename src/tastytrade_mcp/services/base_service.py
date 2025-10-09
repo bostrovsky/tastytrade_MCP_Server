@@ -67,7 +67,7 @@ class BaseTastyTradeService:
         # Decrypt and return access token
         encryption = await get_encryption_service()
         access_token = await encryption.decrypt_token(
-            broker_link.broker_secret.encrypted_access_token,
+            broker_link.broker_secret.enc_access_token,
             token_type="access"
         )
 

@@ -29,41 +29,5 @@
     "created": "2025-01-20T08:00:00Z",
     "last_used": null,
     "execution_count": 0
-  },
-  "test": {
-    "description": "Test shortcut",
-    "tools": [
-      {
-        "name": "help",
-        "args": {}
-      }
-    ],
-    "usage_count": 0,
-    "last_used": null,
-    "created_at": "2025-09-30T02:39:48.746687"
-  },
-  "test_new": {
-    "description": "Test",
-    "tools": [
-      {
-        "name": "help",
-        "args": {}
-      }
-    ],
-    "usage_count": 0,
-    "last_used": null,
-    "created_at": "2025-09-30T02:42:01.891504"
-  },
-  "test_persist": {
-    "description": "Test persistence",
-    "tools": [
-      {
-        "name": "help",
-        "args": {}
-      }
-    ],
-    "usage_count": 0,
-    "last_used": null,
-    "created_at": "2025-09-30T02:48:49.274252"
   }
 }

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tastytrade-mcp"
-version = "1.1.2"
-description = "TastyTrade MCP Server - Multi-LLM trading interface with unified deployment"
+version = "1.4.0"
+description = "TastyTrade MCP Server - Production-ready OAuth trading with full instrument support"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
@@ -36,13 +36,13 @@ dependencies = [
     "tastytrade>=8.0.0",
     "mcp>=1.0.0",
     "cryptography>=41.0.0",
-    "sqlalchemy[asyncio]>=2.0.0",
+    "sqlalchemy>=2.0.0",
     "aiosqlite>=0.19.0",
-    "greenlet>=3.0.0",
     "alembic>=1.12.0",
     "typer>=0.9.0",
     "rich>=13.0.0",
     "psutil>=5.9.0",
+    "redis>=5.0.0",
 ]
 
 [project.optional-dependencies]
@@ -56,10 +56,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/bostrovsky/tastytrade_MCP_Server"
-Documentation = "https://github.com/bostrovsky/tastytrade_MCP_Server/blob/main/README.md"
-Repository = "https://github.com/bostrovsky/tastytrade_MCP_Server"
-Issues = "https://github.com/bostrovsky/tastytrade_MCP_Server/issues"
+Homepage = "https://github.com/tastytrade/tastytrade-mcp"
+Documentation = "https://github.com/tastytrade/tastytrade-mcp/blob/main/README.md"
+Repository = "https://github.com/tastytrade/tastytrade-mcp"
+Issues = "https://github.com/tastytrade/tastytrade-mcp/issues"
 
 [project.scripts]
 tastytrade-mcp = "tastytrade_mcp.cli:main"

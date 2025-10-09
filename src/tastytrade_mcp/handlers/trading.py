@@ -7,13 +7,153 @@ import mcp.types as types
 from tastytrade import Account
 from tastytrade.order import NewOrder, OrderAction, OrderTimeInForce, OrderType as TTOrderType, PriceEffect
 
-from tastytrade_mcp.handlers.handler_adapter import HandlerAdapter
+from tastytrade_mcp.services.simple_session import get_tastytrade_session
 from tastytrade_mcp.config.settings import get_settings
 from tastytrade_mcp.utils.logging import get_logger
 
 logger = get_logger(__name__)
 settings = get_settings()
-adapter = HandlerAdapter(use_database=settings.use_database_mode)
+
+
+async def handle_create_order(arguments: dict[str, Any]) -> list[types.TextContent]:
+    """Create an order for any instrument type (equity, options, futures, crypto).
+
+    Unified order handler that supports:
+    - Equity (stocks)
+    - Equity Options (calls/puts, single or multi-leg)
+    - Futures (/ES, /CL, etc.)
+    - Future Options
+    - Cryptocurrency (BTC/USD, etc.)
+
+    Args:
+        arguments: Dictionary containing:
+            - account_number: Account number (required)
+            - legs: List of order legs (required)
+                - instrument_type: Equity, Equity Option, Future, Future Option, Cryptocurrency
+                - symbol: Trading symbol
+                - quantity: Quantity to trade
+                - action: Buy to Open, Buy to Close, Sell to Open, Sell to Close
+            - order_type: Market, Limit, Stop, Stop Limit, Notional Market (default: Limit)
+            - time_in_force: Day, GTC, GTD, IOC, FOK (default: Day)
+            - price: Limit price (required for Limit orders)
+            - stop_trigger: Stop trigger price (required for Stop orders)
+            - price_effect: Debit or Credit (optional, auto-determined if not provided)
+            - dry_run: Preview without executing (default: true)
+
+    Returns:
+        List containing TextContent with order result
+    """
+    account_number = arguments.get("account_number")
+    legs = arguments.get("legs", [])
+    order_type = arguments.get("order_type", "Limit")
+    time_in_force = arguments.get("time_in_force", "Day")
+    price = arguments.get("price")
+    stop_trigger = arguments.get("stop_trigger")
+    price_effect = arguments.get("price_effect")
+    dry_run = arguments.get("dry_run", True)
+
+    # Validation
+    if not account_number:
+        return [types.TextContent(type="text", text="Error: account_number is required")]
+    if not legs or len(legs) == 0:
+        return [types.TextContent(type="text", text="Error: at least one leg is required")]
+    if len(legs) > 4:
+        return [types.TextContent(type="text", text="Error: maximum 4 legs allowed")]
+
+    # Validate required fields for order types
+    if order_type in ["Limit", "Stop Limit"] and not price:
+        return [types.TextContent(type="text", text=f"Error: price is required for {order_type} orders")]
+    if order_type in ["Stop", "Stop Limit"] and not stop_trigger:
+        return [types.TextContent(type="text", text=f"Error: stop_trigger is required for {order_type} orders")]
+
+    try:
+        session = get_tastytrade_session()
+
+        # Get account
+        accounts = Account.get(session)
+        target_account = None
+        for acc in accounts:
+            if acc.account_number == account_number:
+                target_account = acc
+                break
+
+        if not target_account:
+            return [types.TextContent(type="text", text=f"Account {account_number} not found")]
+
+        # Build order JSON in TastyTrade API format
+        order_json = {
+            "time-in-force": time_in_force,
+            "order-type": order_type,
+            "legs": []
+        }
+
+        # Add price fields if provided
+        if price:
+            order_json["price"] = str(price)
+        if stop_trigger:
+            order_json["stop-trigger"] = str(stop_trigger)
+
+        # Auto-determine price-effect if not provided
+        if not price_effect:
+            # Simple heuristic: Buy = Debit, Sell = Credit
+            first_action = legs[0].get("action", "")
+            if "Buy" in first_action:
+                price_effect = "Debit"
+            elif "Sell" in first_action:
+                price_effect = "Credit"
+
+        if price_effect:
+            order_json["price-effect"] = price_effect
+
+        # Convert legs to API format
+        for leg in legs:
+            order_json["legs"].append({
+                "instrument-type": leg["instrument_type"],
+                "symbol": leg["symbol"],
+                "quantity": str(leg["quantity"]),
+                "action": leg["action"]
+            })
+
+        # Submit order (dry-run or real)
+        if dry_run:
+            url = f'/accounts/{account_number}/orders/dry-run'
+            response = await session._a_post(url, json=order_json)
+            result_prefix = "✅ DRY RUN - Order validated successfully!"
+            note = "\n\n⚠️  This was a DRY RUN. To execute, set dry_run=false"
+        else:
+            url = f'/accounts/{account_number}/orders'
+            response = await session._a_post(url, json=order_json)
+            result_prefix = "✅ ORDER PLACED!"
+            note = ""
+
+        # Format response
+        result = f"{result_prefix}\n\n"
+        result += f"Order Details:\n"
+        result += f"  Account: {account_number}\n"
+        result += f"  Type: {order_type}\n"
+        result += f"  Time in Force: {time_in_force}\n"
+        if price:
+            result += f"  Price: ${price}\n"
+        if stop_trigger:
+            result += f"  Stop Trigger: ${stop_trigger}\n"
+        if price_effect:
+            result += f"  Price Effect: {price_effect}\n"
+
+        result += f"\nLegs:\n"
+        for i, leg in enumerate(legs, 1):
+            result += f"  {i}. {leg['action']} {leg['quantity']} {leg['instrument_type']} {leg['symbol']}\n"
+
+        result += note
+
+        # Add order ID if available
+        if hasattr(response, 'order') and hasattr(response.order, 'id'):
+            result += f"\n\nOrder ID: {response.order.id}"
+
+        return [types.TextContent(type="text", text=result)]
+
+    except Exception as e:
+        logger.error(f"Error creating order: {e}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error creating order: {str(e)}")]
 
 
 async def handle_create_equity_order(arguments: dict[str, Any]) -> list[types.TextContent]:
@@ -46,10 +186,13 @@ async def handle_create_equity_order(arguments: dict[str, Any]) -> list[types.Te
         return [types.TextContent(type="text", text="Error: symbol, side, and quantity are required")]
 
     try:
-        session = await adapter.get_session(user_id)
+        session = get_tastytrade_session()
 
         if not account_number:
-            account_number = await adapter.get_account_number(user_id)
+            # Get first account if not specified
+            accounts = Account.get(session)
+            if accounts:
+                account_number = accounts[0].account_number
 
         accounts = Account.get(session)
         target_account = None
@@ -177,10 +320,13 @@ async def handle_cancel_order(arguments: dict[str, Any]) -> list[types.TextConte
         return [types.TextContent(type="text", text="Error: order_id is required")]
 
     try:
-        session = await adapter.get_session(user_id)
+        session = get_tastytrade_session()
 
         if not account_number:
-            account_number = await adapter.get_account_number(user_id)
+            # Get first account if not specified
+            accounts = Account.get(session)
+            if accounts:
+                account_number = accounts[0].account_number
 
         accounts = Account.get(session)
         target_account = None
@@ -218,10 +364,13 @@ async def handle_list_orders(arguments: dict[str, Any]) -> list[types.TextConten
     format_type = arguments.get("format", "text")
 
     try:
-        session = await adapter.get_session(user_id)
+        session = get_tastytrade_session()
 
         if not account_number:
-            account_number = await adapter.get_account_number(user_id)
+            # Get first account if not specified
+            accounts = Account.get(session)
+            if accounts:
+                account_number = accounts[0].account_number
 
         accounts = Account.get(session)
         target_account = None

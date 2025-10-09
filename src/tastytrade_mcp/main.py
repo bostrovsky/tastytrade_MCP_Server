@@ -13,13 +13,18 @@ import mcp.types as types
 from mcp.server import Server
 from dotenv import load_dotenv
 
-# Load .env file from project root
-env_path = Path(__file__).parent.parent.parent / '.env'
+# Load .env file from standard config directory
+config_dir = Path.home() / ".tastytrade-mcp"
+env_path = config_dir / ".env"
 if env_path.exists():
     load_dotenv(env_path)
 else:
-    # Try current directory
-    load_dotenv()
+    # Fall back to project root (for development) or current directory
+    dev_env = Path(__file__).parent.parent.parent / '.env'
+    if dev_env.exists():
+        load_dotenv(dev_env)
+    else:
+        load_dotenv()  # Try current directory as last resort
 from tastytrade_mcp.config.settings import get_settings
 from tastytrade_mcp.handlers import (
     handle_health_check,
@@ -38,23 +43,15 @@ from tastytrade_mcp.handlers import (
     handle_get_quotes,
     # handle_get_historical_data,  # REMOVED: Fake tool - API doesn't exist
     handle_get_options_chain,
-    handle_scan_opportunities,
-    handle_create_equity_order,
-    handle_create_options_order,
-    handle_confirm_order,
-    handle_cancel_order,
-    handle_list_orders,
-    handle_set_stop_loss,
-    handle_set_take_profit,
+    # Trading handlers: Environment-based routing (OAuth for production, SDK for sandbox)
     handle_get_positions,
     # handle_get_positions_with_greeks,  # REMOVED: Fake tool - Greeks don't exist in API
     handle_analyze_portfolio,
     handle_monitor_position_alerts,
-    handle_analyze_position_correlation,
-    handle_bulk_position_update,
-    handle_analyze_options_strategy,
     handle_suggest_rebalancing,
 )
+# Import universal router (routes ALL handlers to OAuth or SDK based on environment)
+from tastytrade_mcp.handlers.router import route_to_handler
 from tastytrade_mcp.handlers.option_chain_oauth import (
     handle_get_option_chain,
     handle_find_options_by_delta,
@@ -74,14 +71,15 @@ from tastytrade_mcp.handlers.shortcuts import (
     handle_test_shortcut,
     handle_delete_shortcut,
 )
-from tastytrade_mcp.handlers.streaming_oauth import (
-    handle_subscribe_market_stream,
-    handle_unsubscribe_market_stream,
-    handle_get_stream_data,
-    handle_get_stream_status,
-    handle_get_stream_metrics,
-    handle_shutdown_streams,
-)
+# REMOVED: Fake streaming tools - Mock WebSocket implementation
+# from tastytrade_mcp.handlers.streaming_oauth import (
+#     handle_subscribe_market_stream,
+#     handle_unsubscribe_market_stream,
+#     handle_get_stream_data,
+#     handle_get_stream_status,
+#     handle_get_stream_metrics,
+#     handle_shutdown_streams,
+# )
 from tastytrade_mcp.services.websocket import WebSocketManager
 
 # Configure logging to stderr only (stdout must be clean for MCP JSON-RPC)
@@ -416,110 +414,9 @@ async def handle_list_tools() -> list[types.Tool]:
         #         "required": ["symbol", "start_date", "end_date"]
         #     },
         # ),
-        types.Tool(
-            name="subscribe_market_stream",
-            description="Subscribe to real-time market data streams via WebSocket",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "symbols": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "List of symbols to subscribe to (max 100)",
-                        "maxItems": 100
-                    },
-                    "data_types": {
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                            "enum": ["quote", "trade", "status"]
-                        },
-                        "description": "Types of data to stream (default: quote, trade)",
-                        "default": ["quote", "trade"]
-                    },
-                    "user_id": {
-                        "type": "string",
-                        "description": "User ID for authentication"
-                    },
-                    "session_id": {
-                        "type": "string",
-                        "description": "Optional session ID for connection pooling"
-                    }
-                },
-                "required": ["symbols"]
-            },
-        ),
-        types.Tool(
-            name="unsubscribe_market_stream",
-            description="Unsubscribe from market data streams",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "symbols": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "List of symbols to unsubscribe (omit to unsubscribe all)"
-                    },
-                    "user_id": {
-                        "type": "string",
-                        "description": "User ID for authentication"
-                    },
-                    "session_id": {
-                        "type": "string",
-                        "description": "Optional session ID"
-                    }
-                },
-                "required": []
-            },
-        ),
-        types.Tool(
-            name="get_stream_status",
-            description="Get current WebSocket stream status and subscriptions",
-            inputSchema={
-                "type": "object",
-                "properties": {},
-                "required": []
-            },
-        ),
-        types.Tool(
-            name="get_stream_data",
-            description="Get latest data from WebSocket streams",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "symbols": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Symbols to get data for"
-                    },
-                    "data_type": {
-                        "type": "string",
-                        "enum": ["latest", "all"],
-                        "description": "Type of data to retrieve (default: latest)",
-                        "default": "latest"
-                    }
-                },
-                "required": ["symbols"]
-            },
-        ),
-        types.Tool(
-            name="get_stream_metrics",
-            description="Get WebSocket streaming performance metrics",
-            inputSchema={
-                "type": "object",
-                "properties": {},
-                "required": []
-            },
-        ),
-        types.Tool(
-            name="shutdown_streams",
-            description="Gracefully shutdown all WebSocket connections",
-            inputSchema={
-                "type": "object",
-                "properties": {},
-                "required": []
-            },
-        ),
+        # REMOVED: Fake streaming tools (subscribe_market_stream, unsubscribe_market_stream,
+        # get_stream_status, get_stream_data, get_stream_metrics, shutdown_streams)
+        # These were mock WebSocket implementations with no real API backing
         types.Tool(
             name="help",
             description="Get help and documentation for available MCP tools",
@@ -631,8 +528,82 @@ async def handle_list_tools() -> list[types.Tool]:
             },
         ),
         types.Tool(
+            name="create_order",
+            description="Create an order for any instrument type (equity, options, futures, crypto). Supports single-leg and multi-leg orders. Default is dry-run mode for safety.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "account_number": {
+                        "type": "string",
+                        "description": "Account number to place the order (required)"
+                    },
+                    "legs": {
+                        "type": "array",
+                        "description": "Order legs (1 for simple orders, 2-4 for spreads)",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "instrument_type": {
+                                    "type": "string",
+                                    "enum": ["Equity", "Equity Option", "Future", "Future Option", "Cryptocurrency"],
+                                    "description": "Type of instrument"
+                                },
+                                "symbol": {
+                                    "type": "string",
+                                    "description": "Trading symbol (e.g., AAPL, AAPL 251017C00150000, /ES, BTC/USD)"
+                                },
+                                "quantity": {
+                                    "type": "string",
+                                    "description": "Quantity to trade"
+                                },
+                                "action": {
+                                    "type": "string",
+                                    "enum": ["Buy to Open", "Buy to Close", "Sell to Open", "Sell to Close"],
+                                    "description": "Order action"
+                                }
+                            },
+                            "required": ["instrument_type", "symbol", "quantity", "action"]
+                        },
+                        "minItems": 1,
+                        "maxItems": 4
+                    },
+                    "order_type": {
+                        "type": "string",
+                        "enum": ["Market", "Limit", "Stop", "Stop Limit", "Notional Market"],
+                        "description": "Order type (default: Limit)",
+                        "default": "Limit"
+                    },
+                    "time_in_force": {
+                        "type": "string",
+                        "enum": ["Day", "GTC", "GTD", "IOC", "FOK"],
+                        "description": "Time in force (default: Day)",
+                        "default": "Day"
+                    },
+                    "price": {
+                        "type": "string",
+                        "description": "Limit price (required for Limit and Stop Limit orders)"
+                    },
+                    "stop_trigger": {
+                        "type": "string",
+                        "description": "Stop trigger price (required for Stop and Stop Limit orders)"
+                    },
+                    "price_effect": {
+                        "type": "string",
+                        "enum": ["Debit", "Credit"],
+                        "description": "Price effect (auto-determined if not provided: Buy=Debit, Sell=Credit)"
+                    },
+                    "dry_run": {
+                        "type": "boolean",
+                        "description": "Preview order without executing (default: true for safety)",
+                        "default": true
+                    }
+                },
+                "required": ["account_number", "legs"]
+            },
+        ),
+        types.Tool(
             name="create_equity_order",
-            description="Create a preview for an equity order (requires confirmation)",
+            description="DEPRECATED: Use create_order instead. Create a preview for an equity order (requires confirmation)",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -825,7 +796,7 @@ async def handle_list_tools() -> list[types.Tool]:
         ),
         types.Tool(
             name="get_options_chain",
-            description="Get options chain data for a symbol",
+            description="Get options chain for a symbol with pricing. Supports specific expiration dates or DTE ranges. For weekly options that may not appear in the chain, use specific expiration + strike and the tool will construct the symbol automatically.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -835,21 +806,25 @@ async def handle_list_tools() -> list[types.Tool]:
                     },
                     "symbol": {
                         "type": "string",
-                        "description": "Underlying symbol"
+                        "description": "Underlying stock symbol (e.g., AAPL, MSFT)"
                     },
-                    "expiration_date": {
+                    "expiration": {
                         "type": "string",
-                        "description": "Expiration date (YYYY-MM-DD) or 'all' for all dates"
+                        "description": "Expiration date YYYY-MM-DD (e.g., '2025-10-17') OR DTE range (e.g., '30-35' for 30-35 days out)"
                     },
-                    "strike_range": {
-                        "type": "integer",
-                        "description": "Number of strikes above/below current price (default: 10)",
-                        "default": 10
+                    "min_strike": {
+                        "type": "number",
+                        "description": "Minimum strike price to include"
                     },
-                    "include_greeks": {
-                        "type": "boolean",
-                        "description": "Include Greeks in response (default: true)",
-                        "default": True
+                    "max_strike": {
+                        "type": "number",
+                        "description": "Maximum strike price to include"
+                    },
+                    "option_type": {
+                        "type": "string",
+                        "enum": ["call", "put", "both"],
+                        "description": "Type of options to return (default: both)",
+                        "default": "both"
                     },
                     "format": {
                         "type": "string",
@@ -861,61 +836,7 @@ async def handle_list_tools() -> list[types.Tool]:
                 "required": ["symbol"]
             },
         ),
-        types.Tool(
-            name="analyze_options_strategy",
-            description="Analyze an options strategy for risk/reward metrics",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "underlying_symbol": {
-                        "type": "string",
-                        "description": "Underlying symbol"
-                    },
-                    "underlying_price": {
-                        "type": "number",
-                        "description": "Current underlying price"
-                    },
-                    "legs": {
-                        "type": "array",
-                        "description": "Options legs to analyze",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "option_type": {
-                                    "type": "string",
-                                    "enum": ["call", "put"]
-                                },
-                                "side": {
-                                    "type": "string",
-                                    "enum": ["buy", "sell"]
-                                },
-                                "quantity": {
-                                    "type": "integer"
-                                },
-                                "strike_price": {
-                                    "type": "number"
-                                },
-                                "expiration_date": {
-                                    "type": "string"
-                                },
-                                "premium": {
-                                    "type": "number",
-                                    "description": "Premium per contract"
-                                }
-                            },
-                            "required": ["option_type", "side", "quantity", "strike_price", "expiration_date", "premium"]
-                        }
-                    },
-                    "format": {
-                        "type": "string",
-                        "enum": ["text", "json"],
-                        "description": "Output format (default: text)",
-                        "default": "text"
-                    }
-                },
-                "required": ["underlying_symbol", "underlying_price", "legs"]
-            },
-        ),
+        # REMOVED: analyze_options_strategy - Pure stub with no implementation
         types.Tool(
             name="monitor_position_alerts",
             description="Monitor position alerts for P&L thresholds and price movements",
@@ -996,30 +917,7 @@ async def handle_list_tools() -> list[types.Tool]:
                 "required": ["account_number", "symbol", "target_price"]
             },
         ),
-        types.Tool(
-            name="analyze_position_correlation",
-            description="Analyze correlation between positions to identify concentration risks",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "account_number": {
-                        "type": "string",
-                        "description": "Account number"
-                    },
-                    "lookback_days": {
-                        "type": "integer",
-                        "description": "Days of historical data for correlation analysis",
-                        "default": 30
-                    },
-                    "correlation_threshold": {
-                        "type": "number",
-                        "description": "Correlation threshold for risk identification",
-                        "default": 0.7
-                    }
-                },
-                "required": ["account_number"]
-            },
-        ),
+        # REMOVED: analyze_position_correlation - Fake correlation data, no real implementation
         types.Tool(
             name="suggest_rebalancing",
             description="Generate portfolio rebalancing suggestions based on target allocations",
@@ -1044,35 +942,7 @@ async def handle_list_tools() -> list[types.Tool]:
                 "required": ["account_number", "target_allocations"]
             },
         ),
-        types.Tool(
-            name="bulk_position_update",
-            description="Perform bulk operations on multiple positions",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "account_number": {
-                        "type": "string",
-                        "description": "Account number"
-                    },
-                    "operation": {
-                        "type": "string",
-                        "enum": ["set_stop_loss", "set_take_profit", "close_positions"],
-                        "description": "Bulk operation to perform"
-                    },
-                    "symbols": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "List of symbols to apply operation to"
-                    },
-                    "parameters": {
-                        "type": "object",
-                        "description": "Operation-specific parameters",
-                        "additionalProperties": True
-                    }
-                },
-                "required": ["account_number", "operation", "symbols"]
-            },
-        ),
+        # REMOVED: bulk_position_update - Needs verification/removal per handoff doc
 
         # Emergency Control Tools
         types.Tool(
@@ -1238,60 +1108,7 @@ async def handle_list_tools() -> list[types.Tool]:
                 "required": ["account_number"]
             },
         ),
-        types.Tool(
-            name="scan_opportunities",
-            description="Scan for trading opportunities based on strategy criteria",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "user_id": {
-                        "type": "string",
-                        "description": "User ID who is scanning"
-                    },
-                    "strategy_type": {
-                        "type": "string",
-                        "enum": ["covered_call", "cash_secured_put", "strangles"],
-                        "description": "Type of strategy to scan for",
-                        "default": "covered_call"
-                    },
-                    "min_return": {
-                        "type": "number",
-                        "description": "Minimum return percentage required"
-                    },
-                    "max_risk": {
-                        "type": "number",
-                        "description": "Maximum risk amount per trade"
-                    },
-                    "max_dte": {
-                        "type": "integer",
-                        "description": "Maximum days to expiration",
-                        "default": 45
-                    },
-                    "min_volume": {
-                        "type": "integer",
-                        "description": "Minimum option volume",
-                        "default": 100
-                    },
-                    "watchlist_symbols": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "List of symbols to scan (if omitted, uses default watchlist)"
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Maximum results to return",
-                        "default": 20
-                    },
-                    "format": {
-                        "type": "string",
-                        "enum": ["text", "json"],
-                        "description": "Output format (default: text)",
-                        "default": "text"
-                    }
-                },
-                "required": []
-            },
-        ),
+        # REMOVED: scan_opportunities - Fake endpoint with fake data generation
     ]
 
     # Log tool count
@@ -1363,65 +1180,23 @@ async def format_balances_response(balances: dict, format_type: str = "text") ->
 async def handle_call_tool(
     name: str, arguments: dict[str, Any]
 ) -> list[types.TextContent]:
-    """Handle tool calls."""
+    """Handle tool calls.
 
-    # Health check tool
+    Most handlers are routed through the universal router which selects
+    OAuth (production) or SDK (sandbox) implementations based on environment.
+
+    Special cases that don't route:
+    - health_check: Direct system check
+    - help: Direct help system
+    - shortcuts: Direct shortcut management
+    - Specialized tools: find_options_by_delta, stream_option_quotes, get_realtime_quotes
+    """
+
+    # Health check tool (direct, no routing)
     if name == "health_check":
         return await handle_health_check(arguments)
 
-    # Account tools
-    elif name == "get_accounts":
-        return await handle_get_accounts(arguments)
-    elif name == "get_balances":
-        return await handle_get_balances(arguments)
-
-    # Position tools
-    elif name == "get_positions":
-        return await handle_get_positions(arguments)
-    # REMOVED: get_positions_with_greeks - Fake tool, Greeks don't exist in TastyTrade API
-    # elif name == "get_positions_with_greeks":
-    #     return await handle_get_positions_with_greeks(arguments)
-    elif name == "analyze_portfolio":
-        return await handle_analyze_portfolio(arguments)
-
-    # Market data tools
-    elif name == "search_symbols":
-        return await handle_search_symbols(arguments)
-    elif name == "search_symbols_advanced":
-        return await handle_search_symbols_advanced(arguments)
-    elif name == "get_quotes":
-        return await handle_get_quotes(arguments)
-    # REMOVED: get_historical_data - Fake tool, endpoint doesn't exist in TastyTrade API
-    # elif name == "get_historical_data":
-    #     return await handle_get_historical_data(arguments)
-    elif name == "get_options_chain":
-        return await handle_get_options_chain(arguments)
-    elif name == "get_option_chain":  # New handler with better filtering
-        return await handle_get_option_chain(arguments)
-    elif name == "find_options_by_delta":
-        return await handle_find_options_by_delta(arguments)
-    elif name == "get_realtime_quotes":
-        return await handle_get_realtime_quotes(arguments)
-    elif name == "stream_option_quotes":
-        return await handle_stream_option_quotes(arguments)
-    elif name == "scan_opportunities":
-        return await handle_scan_opportunities(arguments)
-
-    # Streaming tools
-    elif name == "subscribe_market_stream":
-        return await handle_subscribe_market_stream(arguments, websocket_manager)
-    elif name == "unsubscribe_market_stream":
-        return await handle_unsubscribe_market_stream(arguments, websocket_manager)
-    elif name == "get_stream_data":
-        return await handle_get_stream_data(arguments, websocket_manager)
-    elif name == "get_stream_status":
-        return await handle_get_stream_status(arguments, websocket_manager)
-    elif name == "get_stream_metrics":
-        return await handle_get_stream_metrics(arguments, websocket_manager)
-    elif name == "shutdown_streams":
-        return await handle_shutdown_streams(arguments, websocket_manager)
-
-    # Help and shortcuts tools
+    # Help and shortcuts tools (direct, no routing)
     elif name == "help":
         return await handle_help(arguments)
     elif name == "list_shortcuts":
@@ -1435,56 +1210,26 @@ async def handle_call_tool(
     elif name == "delete_shortcut":
         return await handle_delete_shortcut(arguments)
 
-    # Trading tools
-    elif name == "create_equity_order":
-        return await handle_create_equity_order(arguments)
-    elif name == "create_options_order":
-        return await handle_create_options_order(arguments)
-    elif name == "confirm_order":
-        return await handle_confirm_order(arguments)
-    elif name == "cancel_order":
-        return await handle_cancel_order(arguments)
-    elif name == "list_orders":
-        return await handle_list_orders(arguments)
-    elif name == "set_stop_loss":
-        return await handle_set_stop_loss(arguments)
-    elif name == "set_take_profit":
-        return await handle_set_take_profit(arguments)
+    # Specialized OAuth-only tools (not in router yet)
+    elif name == "find_options_by_delta":
+        return await handle_find_options_by_delta(arguments)
+    elif name == "get_realtime_quotes":
+        return await handle_get_realtime_quotes(arguments)
+    elif name == "stream_option_quotes":
+        return await handle_stream_option_quotes(arguments)
+    elif name == "get_option_quotes":
+        return await handle_get_option_quotes(arguments)
 
-    # Position management tools
-    elif name == "monitor_position_alerts":
-        return await handle_monitor_position_alerts(arguments)
-    elif name == "analyze_position_correlation":
-        return await handle_analyze_position_correlation(arguments)
-    elif name == "bulk_position_update":
-        return await handle_bulk_position_update(arguments)
-
-    # Analysis tools
-    elif name == "analyze_options_strategy":
-        return await handle_analyze_options_strategy(arguments)
-    elif name == "suggest_rebalancing":
-        return await handle_suggest_rebalancing(arguments)
-
-    # Emergency control tools
-    elif name == "panic_button":
-        return await handle_panic_button(arguments)
-    elif name == "emergency_exit":
-        return await handle_emergency_exit(arguments)
-    elif name == "halt_trading":
-        return await handle_halt_trading(arguments)
-    elif name == "resume_trading":
-        return await handle_resume_trading(arguments)
-    elif name == "check_emergency_conditions":
-        return await handle_check_emergency_conditions(arguments)
-    elif name == "create_circuit_breaker":
-        return await handle_create_circuit_breaker(arguments)
-    elif name == "emergency_stop_all":
-        return await handle_emergency_stop_all(arguments)
-    elif name == "get_emergency_history":
-        return await handle_get_emergency_history(arguments)
-
+    # All other handlers: Route through universal router
+    # This includes:
+    # - Account tools: get_accounts, get_balances
+    # - Position tools: get_positions, analyze_portfolio, monitor_position_alerts
+    # - Market data: search_symbols, search_symbols_advanced, get_quotes, get_options_chain
+    # - Trading: create_order, create_equity_order (deprecated), create_options_order (deprecated), confirm_order, cancel_order, list_orders, set_stop_loss, set_take_profit
+    # - Emergency: panic_button, emergency_exit, halt_trading, resume_trading, emergency_stop_all, create_circuit_breaker, check_emergency_conditions, get_emergency_history
+    # - Analysis: suggest_rebalancing
     else:
-        raise ValueError(f"Unknown tool: {name}")
+        return await route_to_handler(name, arguments)
 
 
 async def main():

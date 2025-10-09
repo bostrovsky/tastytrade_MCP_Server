@@ -7,14 +7,13 @@ import mcp.types as types
 from tastytrade.search import symbol_search
 from tastytrade.market_data import get_market_data
 
-from tastytrade_mcp.handlers.handler_adapter import HandlerAdapter
+from tastytrade_mcp.services.simple_session import get_tastytrade_session
 from tastytrade_mcp.config.settings import get_settings
 from tastytrade_mcp.services.cache import get_cache
 from tastytrade_mcp.utils.logging import get_logger
 
 logger = get_logger(__name__)
 settings = get_settings()
-adapter = HandlerAdapter(use_database=settings.use_database_mode)
 
 
 
@@ -334,7 +333,7 @@ async def handle_search_symbols(arguments: dict[str, Any]) -> list[types.TextCon
             return [types.TextContent(type="text", text=formatted)]
 
         # Not in cache, get from API
-        session = await adapter.get_session(user_id)
+        session = get_tastytrade_session()
 
         # Use TastyTrade SDK directly
         symbols = symbol_search(session, query)
@@ -412,7 +411,7 @@ async def handle_search_symbols_advanced(arguments: dict[str, Any]) -> list[type
     format_type = arguments.get("format", "text")
 
     try:
-        session = await adapter.get_session(user_id)
+        session = get_tastytrade_session()
 
         # Use TastyTrade SDK directly for search
         symbols = symbol_search(session, query)
@@ -494,7 +493,7 @@ async def handle_get_quotes(arguments: dict[str, Any]) -> list[types.TextContent
             return [types.TextContent(type="text", text=formatted)]
 
         # Not in cache, get from API
-        session = await adapter.get_session(user_id)
+        session = get_tastytrade_session()
 
         # Use TastyTrade SDK directly to get quotes
         # Convert list to comma-separated string for API call
@@ -589,7 +588,7 @@ async def handle_get_historical_data(arguments: dict[str, Any]) -> list[types.Te
             return [types.TextContent(type="text", text=formatted)]
 
         # Not in cache, get from API
-        session = await adapter.get_session(user_id)
+        session = get_tastytrade_session()
 
         # Use TastyTrade SDK directly for historical data
         # Note: Actual implementation would use appropriate SDK method
@@ -654,7 +653,7 @@ async def handle_get_options_chain(arguments: dict[str, Any]) -> list[types.Text
         ]
 
     try:
-        session = await adapter.get_session(user_id)
+        session = get_tastytrade_session()
 
         # Use TastyTrade SDK directly for options chain
         # For now, return a placeholder message
@@ -715,7 +714,7 @@ async def handle_scan_opportunities(arguments: dict[str, Any]) -> list[types.Tex
     format_type = arguments.get("format", "text")
 
     try:
-        session = await adapter.get_session(user_id)
+        session = get_tastytrade_session()
 
         # Use TastyTrade SDK directly for opportunity scanning
         # For now, return placeholder opportunities

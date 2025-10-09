@@ -168,8 +168,8 @@ class OAuthService:
             
             # Update secrets
             if broker_link.broker_secret:
-                broker_link.broker_secret.encrypted_access_token = encrypted_access
-                broker_link.broker_secret.encrypted_refresh_token = encrypted_refresh
+                broker_link.broker_secret.enc_access_token = encrypted_access
+                broker_link.broker_secret.enc_refresh_token = encrypted_refresh
                 broker_link.broker_secret.access_expires_at = datetime.utcnow() + timedelta(
                     seconds=tokens.get("expires_in", 3600)
                 )
@@ -188,8 +188,8 @@ class OAuthService:
             broker_secret = BrokerSecret(
                 id=uuid4(),
                 broker_link_id=broker_link.id,
-                encrypted_access_token=encrypted_access,
-                encrypted_refresh_token=encrypted_refresh,
+                enc_access_token=encrypted_access,
+                enc_refresh_token=encrypted_refresh,
                 access_expires_at=datetime.utcnow() + timedelta(
                     seconds=tokens.get("expires_in", 3600)
                 ),
@@ -250,7 +250,7 @@ class OAuthService:
         if code_verifier and self.config.use_pkce:
             data["code_verifier"] = code_verifier
         
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 self.config.token_url,
                 data=data,
@@ -260,6 +260,129 @@ class OAuthService:
             
         return response.json()
     
+    async def setup_personal_grant(
+        self,
+        user_id: UUID,
+        refresh_token: str,
+        is_sandbox: bool = False,
+    ) -> BrokerLink:
+        """
+        Setup OAuth using personal grant (refresh token from TastyTrade).
+
+        This is for personal use where the user manually creates an OAuth app
+        and grant on my.tastytrade.com, then provides the refresh token.
+
+        Args:
+            user_id: User ID setting up the grant
+            refresh_token: Refresh token from TastyTrade personal grant
+            is_sandbox: Whether using sandbox environment
+
+        Returns:
+            Created or updated BrokerLink
+
+        Raises:
+            httpx.HTTPError: If initial token request fails
+        """
+        # Determine token URL based on is_sandbox parameter
+        if is_sandbox:
+            token_url = "https://api.cert.tastyworks.com/oauth/token"
+        else:
+            token_url = "https://api.tastyworks.com/oauth/token"
+
+        # Use refresh token to get initial access token
+        data = {
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "client_id": self.config.client_id,
+        }
+
+        if self.config.client_secret:
+            data["client_secret"] = self.config.client_secret
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                token_url,
+                data=data,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            response.raise_for_status()
+            tokens = response.json()
+
+        # Encrypt tokens
+        encryption = await get_encryption_service()
+        encrypted_access = await encryption.encrypt_token(
+            tokens["access_token"],
+            token_type="access",
+        )
+        encrypted_refresh = await encryption.encrypt_token(
+            refresh_token,  # Store the original refresh token
+            token_type="refresh",
+        )
+
+        # Check for existing broker link
+        result = await self.session.execute(
+            select(BrokerLink).where(
+                BrokerLink.user_id == user_id,
+                BrokerLink.provider == "tastytrade",
+            )
+        )
+        broker_link = result.scalar_one_or_none()
+
+        if broker_link:
+            # Update existing link
+            broker_link.status = LinkStatus.ACTIVE
+            broker_link.linked_at = datetime.utcnow()
+            broker_link.revoked_at = None
+
+            # Update secrets
+            if broker_link.broker_secret:
+                broker_link.broker_secret.enc_access_token = encrypted_access
+                broker_link.broker_secret.enc_refresh_token = encrypted_refresh
+                broker_link.broker_secret.access_expires_at = datetime.utcnow() + timedelta(
+                    seconds=tokens.get("expires_in", 900)
+                )
+                broker_link.broker_secret.updated_at = datetime.utcnow()
+        else:
+            # Create new broker link
+            broker_link = BrokerLink(
+                id=uuid4(),
+                user_id=user_id,
+                provider="tastytrade",
+                is_sandbox=is_sandbox,
+                status=LinkStatus.ACTIVE,
+                linked_at=datetime.utcnow(),
+            )
+
+            # Create broker secret
+            broker_secret = BrokerSecret(
+                id=uuid4(),
+                broker_link_id=broker_link.id,
+                enc_access_token=encrypted_access,
+                enc_refresh_token=encrypted_refresh,
+                access_expires_at=datetime.utcnow() + timedelta(
+                    seconds=tokens.get("expires_in", 900)
+                ),
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+
+            broker_link.broker_secret = broker_secret
+            self.session.add(broker_link)
+            self.session.add(broker_secret)
+
+        # Note: Commit is handled by the session context manager
+        # Don't manually commit here to avoid greenlet context issues
+
+        logger.info(
+            "Personal grant setup completed",
+            extra={
+                "user_id": str(user_id),
+                "broker_link_id": str(broker_link.id),
+            }
+        )
+
+        return broker_link
+
     async def refresh_tokens(self, broker_link: BrokerLink) -> None:
         """
         Refresh access token using refresh token.
@@ -277,7 +400,7 @@ class OAuthService:
         # Decrypt refresh token
         encryption = await get_encryption_service()
         refresh_token = await encryption.decrypt_token(
-            broker_link.broker_secret.encrypted_refresh_token,
+            broker_link.broker_secret.enc_refresh_token,
             token_type="refresh",
         )
         
@@ -291,7 +414,7 @@ class OAuthService:
         if self.config.client_secret:
             data["client_secret"] = self.config.client_secret
         
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 self.config.token_url,
                 data=data,
@@ -305,23 +428,24 @@ class OAuthService:
             tokens["access_token"],
             token_type="access",
         )
-        
-        broker_link.broker_secret.encrypted_access_token = encrypted_access
+
+        broker_link.broker_secret.enc_access_token = encrypted_access
         broker_link.broker_secret.access_expires_at = datetime.utcnow() + timedelta(
             seconds=tokens.get("expires_in", 3600)
         )
-        
+
         # Update refresh token if provided
         if "refresh_token" in tokens:
             encrypted_refresh = await encryption.encrypt_token(
                 tokens["refresh_token"],
                 token_type="refresh",
             )
-            broker_link.broker_secret.encrypted_refresh_token = encrypted_refresh
-        
+            broker_link.broker_secret.enc_refresh_token = encrypted_refresh
+
         broker_link.broker_secret.updated_at = datetime.utcnow()
-        await self.session.commit()
-        
+        # Note: Commit is handled by the session context manager
+        # Don't manually commit here to avoid greenlet context issues
+
         logger.info(
             "Tokens refreshed",
             extra={"broker_link_id": str(broker_link.id)}
@@ -344,7 +468,7 @@ class OAuthService:
         # Decrypt access token
         encryption = await get_encryption_service()
         access_token = await encryption.decrypt_token(
-            broker_link.broker_secret.encrypted_access_token,
+            broker_link.broker_secret.enc_access_token,
             token_type="access",
         )
         
@@ -357,7 +481,7 @@ class OAuthService:
         if self.config.client_secret:
             data["client_secret"] = self.config.client_secret
         
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 self.config.revoke_url,
                 data=data,
@@ -374,9 +498,10 @@ class OAuthService:
         # Clear tokens
         await self.session.delete(broker_link.broker_secret)
         broker_link.broker_secret = None
-        
-        await self.session.commit()
-        
+
+        # Note: Commit is handled by the session context manager
+        # Don't manually commit here to avoid greenlet context issues
+
         logger.info(
             "Tokens revoked",
             extra={"broker_link_id": str(broker_link.id)}

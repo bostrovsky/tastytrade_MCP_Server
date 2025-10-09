@@ -75,12 +75,24 @@ def create_env_file(
     use_production: bool = False,
 ) -> Path:
     """Create .env file with appropriate settings"""
-    env_path = Path.cwd() / ".env"
+    # Store config in user's home directory for consistency
+    config_dir = Path.home() / ".tastytrade-mcp"
+    config_dir.mkdir(exist_ok=True)
+    env_path = config_dir / ".env"
+
+    # Generate encryption keys if not already set
+    import secrets
+    encryption_key = os.getenv("TASTYTRADE_ENCRYPTION_KEY") or secrets.token_urlsafe(32)
+    encryption_salt = os.getenv("TASTYTRADE_ENCRYPTION_SALT") or secrets.token_hex(16)
+    secret_key = os.getenv("TASTYTRADE_SECRET_KEY") or secrets.token_urlsafe(32)
 
     # Base settings
     env_vars = {
         "TASTYTRADE_USE_PRODUCTION": str(use_production).lower(),
         "TASTYTRADE_SINGLE_TENANT": "true",
+        "TASTYTRADE_ENCRYPTION_KEY": encryption_key,
+        "TASTYTRADE_ENCRYPTION_SALT": encryption_salt,
+        "TASTYTRADE_SECRET_KEY": secret_key,
     }
 
     if mode == "simple":
@@ -90,12 +102,15 @@ def create_env_file(
             "TASTYTRADE_SANDBOX_PASSWORD": password or "",
         })
     elif mode == "database":
+        # Store database in config directory
+        config_dir = Path.home() / ".tastytrade-mcp"
+        db_path = config_dir / "tastytrade_mcp.db"
         env_vars.update({
             "TASTYTRADE_USE_DATABASE_MODE": "true",
             "TASTYTRADE_CLIENT_ID": client_id or "",
             "TASTYTRADE_CLIENT_SECRET": client_secret or "",
             "TASTYTRADE_REFRESH_TOKEN": refresh_token or "",
-            "DATABASE_URL": "sqlite+aiosqlite:///./tastytrade_mcp.db",
+            "DATABASE_URL": f"sqlite+aiosqlite:///{db_path}",
         })
 
     # Write to .env file
@@ -137,11 +152,29 @@ def add_to_claude_desktop(server_path: Path) -> bool:
             config["mcpServers"] = {}
 
         # Add TastyTrade MCP server
+        # Find the tastytrade-mcp executable path
+        import shutil
+        executable_path = shutil.which("tastytrade-mcp")
+
+        if not executable_path:
+            # Try common installation paths
+            possible_paths = [
+                Path.home() / ".local" / "bin" / "tastytrade-mcp",
+                Path("/usr/local/bin/tastytrade-mcp"),
+                Path("/opt/homebrew/bin/tastytrade-mcp"),
+            ]
+            for path in possible_paths:
+                if path.exists():
+                    executable_path = str(path)
+                    break
+
+        if not executable_path:
+            raise Exception("Could not find tastytrade-mcp executable. Please ensure it's installed via pipx.")
+
+        # Use absolute path to ensure Claude Desktop can find it
         config["mcpServers"]["tastytrade-mcp"] = {
-            "command": "python",
-            "args": ["-m", "tastytrade_mcp.main"],
-            "cwd": str(server_path.parent),
-            "env": {}
+            "command": executable_path,
+            "args": ["local"]
         }
 
         # Write updated config
@@ -417,25 +450,27 @@ def setup(
             console.print(f"\n[green]✓ Created configuration file: {env_path}[/green]")
 
         elif mode == "database":
-            # Database mode setup
+            # Database mode setup with personal grant
             if interactive:
-                console.print("\n[blue]Database Mode: OAuth2 Setup[/blue]")
-                console.print("[yellow]You'll need OAuth2 credentials from TastyTrade Developer Portal[/yellow]")
+                console.print("\n[blue]Database Mode: OAuth2 Personal Grant Setup[/blue]")
+                console.print("[yellow]Follow these steps to get your OAuth credentials:[/yellow]\n")
+                console.print("1. Go to: https://my.tastytrade.com")
+                console.print("2. Navigate to: Manage → My Profile → API → OAuth Applications")
+                console.print("3. Click '+ New OAuth Client' and fill out:")
+                console.print("   - Redirect URI: http://localhost:8000/callback")
+                console.print("   - Scopes: read, trade")
+                console.print("4. Copy your Client ID and Client Secret")
+                console.print("5. Click 'Manage' → 'Create Grant' to get your Refresh Token\n")
 
                 client_id = Prompt.ask("[yellow]OAuth2 Client ID")
                 client_secret = Prompt.ask("[yellow]OAuth2 Client Secret", password=True)
+                refresh_token = Prompt.ask("[yellow]Refresh Token (from personal grant)", password=True)
             else:
                 client_id = os.getenv("TASTYTRADE_CLIENT_ID")
                 client_secret = os.getenv("TASTYTRADE_CLIENT_SECRET")
-                if not client_id or not client_secret:
-                    raise SetupError("OAuth2 credentials required for database mode")
-
-            # Run OAuth flow
-            console.print("\n[blue]Starting OAuth2 authorization flow...[/blue]")
-            refresh_token = asyncio.run(run_oauth_flow(client_id, client_secret, use_production))
-
-            if not refresh_token:
-                raise SetupError("Failed to get OAuth2 refresh token")
+                refresh_token = os.getenv("TASTYTRADE_REFRESH_TOKEN")
+                if not client_id or not client_secret or not refresh_token:
+                    raise SetupError("OAuth2 credentials and refresh token required for database mode")
 
             # Create .env file
             env_path = create_env_file(
@@ -445,6 +480,13 @@ def setup(
                 refresh_token=refresh_token,
                 use_production=use_production
             )
+
+            # Reload environment variables from the newly created .env file
+            load_dotenv(env_path, override=True)
+
+            # Reset cached settings to pick up new environment variables
+            from tastytrade_mcp.config.settings import reset_settings
+            reset_settings()
 
             # Initialize database with user setup
             console.print("\n[blue]Setting up database with encrypted tokens...[/blue]")
@@ -497,10 +539,17 @@ def local():
     try:
         import asyncio
         from tastytrade_mcp.main import main as mcp_main
-        console.print("[blue]Starting TastyTrade MCP server for Claude Desktop...[/blue]")
+        # DO NOT print to stdout in stdio mode - it breaks MCP JSON protocol
+        # All output must go to stderr
+        import sys
+        print("Starting TastyTrade MCP server for Claude Desktop...", file=sys.stderr)
         asyncio.run(mcp_main())
     except Exception as e:
-        console.print(f"[red]Failed to start MCP server: {e}[/red]")
+        import sys
+        import traceback
+        print(f"Failed to start MCP server: {e}", file=sys.stderr)
+        print("Full traceback:", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
         sys.exit(1)
 
 

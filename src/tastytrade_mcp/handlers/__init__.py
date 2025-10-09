@@ -43,7 +43,7 @@ from .advanced_market_oauth import (
     handle_search_symbols_advanced,
     # handle_get_historical_data,  # REMOVED: Fake tool - API doesn't exist
     handle_get_options_chain,
-    handle_scan_opportunities,
+    # handle_scan_opportunities,  # REMOVED: Fake tool - Fake endpoint + fake data
 )
 
 # Import OAuth-based trading handlers
@@ -65,23 +65,23 @@ from .positions_oauth import (
 from .advanced_positions_oauth import (
     # handle_get_positions_with_greeks,  # REMOVED: Fake tool - Greeks don't exist
     handle_monitor_position_alerts,
-    handle_analyze_position_correlation,
-    handle_bulk_position_update,
+    # handle_analyze_position_correlation,  # REMOVED: Fake tool - Fake correlation data
+    # handle_bulk_position_update,  # REMOVED: Fake tool - Needs verification/removal
 )
 
-# Import OAuth-based streaming handlers
-from .streaming_oauth import (
-    handle_subscribe_market_stream,
-    handle_unsubscribe_market_stream,
-    handle_get_stream_data,
-    handle_get_stream_status,
-    handle_get_stream_metrics,
-    handle_shutdown_streams,
-)
+# REMOVED: OAuth-based streaming handlers - Mock WebSocket implementation
+# from .streaming_oauth import (
+#     handle_subscribe_market_stream,
+#     handle_unsubscribe_market_stream,
+#     handle_get_stream_data,
+#     handle_get_stream_status,
+#     handle_get_stream_metrics,
+#     handle_shutdown_streams,
+# )
 
 # Import OAuth-based analysis handlers
 from .analysis_oauth import (
-    handle_analyze_options_strategy,
+    # handle_analyze_options_strategy,  # REMOVED: Fake tool - Pure stub
     handle_suggest_rebalancing,
     handle_analyze_portfolio,
 )
@@ -119,7 +119,7 @@ __all__ = [
     "handle_get_quotes",
     # "handle_get_historical_data",  # REMOVED: Fake tool
     "handle_get_options_chain",
-    "handle_scan_opportunities",
+    # "handle_scan_opportunities",  # REMOVED: Fake tool
     # Trading function handlers
     "handle_create_equity_order",
     "handle_create_options_order",
@@ -133,17 +133,17 @@ __all__ = [
     # "handle_get_positions_with_greeks",  # REMOVED: Fake tool
     "handle_analyze_portfolio",
     "handle_monitor_position_alerts",
-    "handle_analyze_position_correlation",
-    "handle_bulk_position_update",
-    # Streaming function handlers
-    "handle_subscribe_market_stream",
-    "handle_unsubscribe_market_stream",
-    "handle_get_stream_data",
-    "handle_get_stream_status",
-    "handle_get_stream_metrics",
-    "handle_shutdown_streams",
+    # "handle_analyze_position_correlation",  # REMOVED: Fake tool
+    # "handle_bulk_position_update",  # REMOVED: Fake tool
+    # Streaming function handlers - REMOVED: All fake tools
+    # "handle_subscribe_market_stream",
+    # "handle_unsubscribe_market_stream",
+    # "handle_get_stream_data",
+    # "handle_get_stream_status",
+    # "handle_get_stream_metrics",
+    # "handle_shutdown_streams",
     # Analysis function handlers
-    "handle_analyze_options_strategy",
+    # "handle_analyze_options_strategy",  # REMOVED: Fake tool
     "handle_suggest_rebalancing",
     # Registry functions
     "register_handler",

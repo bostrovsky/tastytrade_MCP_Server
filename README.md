@@ -9,6 +9,12 @@ A **Model Context Protocol (MCP) server** that connects your **TastyTrade tradin
 
 ## 🌟 Features
 
+### **✅ Production-Ready OAuth Trading** (v1.4.0)
+- 🎉 **Full OAuth Support** - Production trading via OAuth2 authentication
+- 📈 **All Instrument Types** - Stocks, Options, Futures, Crypto
+- ✅ **Tested & Verified** - Real orders placed and cancelled successfully
+- 🔄 **Universal Order Handler** - Same code works in sandbox and production
+
 ### **Multi-LLM Support**
 - 🤖 **Claude Desktop** - Native MCP integration via stdio
 - 💬 **ChatGPT** - HTTP MCP Bridge for Developer Mode
@@ -19,6 +25,7 @@ A **Model Context Protocol (MCP) server** that connects your **TastyTrade tradin
 - 💼 **Portfolio Management** - Account positions, balances, order history
 - 🔍 **Symbol Search** - Find stocks, options, and other instruments
 - 🔒 **Security First** - Two-step trading confirmation, audit logging
+- 💰 **Full Order Support** - Limit, Market, Stop, Stop Limit orders
 
 ### **API Limitations**
 > ⚠️ **Important**: The TastyTrade API has certain limitations. The following features are NOT available:
@@ -64,29 +71,52 @@ The setup wizard will guide you through two authentication modes:
 - Persistent authentication sessions
 - SQLite database with encrypted tokens
 
-#### **OAuth2 Setup for Database Mode**
+#### **OAuth2 Personal Grant Setup for Database Mode**
 
-To use database mode, you need to register an OAuth application with TastyTrade:
+Database mode uses OAuth2 personal grants for secure, encrypted token storage. This is perfect for personal use and self-hosted deployments.
 
-1. **Register OAuth Application**:
-   - Visit https://developer.tastytrade.com
-   - Create a new OAuth application for "TastyTrade MCP Server"
-   - Set redirect URI to: `http://localhost:8000/callback`
-   - Note your `CLIENT_ID` and `CLIENT_SECRET`
+**Step 1: Create Your OAuth Application**
 
-2. **Run Database Setup**:
-   ```bash
-   tastytrade-mcp setup --mode database
-   ```
-   - Enter your OAuth credentials when prompted
-   - Browser will open automatically for TastyTrade authorization
-   - Complete the OAuth flow to store encrypted tokens
+1. Go to https://my.tastytrade.com
+2. Navigate to: **Manage** → **My Profile** → **API** → **OAuth Applications**
+3. Click **+ New OAuth Client**
+4. Fill out the form:
+   - **Client Name**: TastyTrade MCP Server (or your preferred name)
+   - **Redirect URI**: `http://localhost:8000/callback` (required but not used for personal grants)
+   - **Scopes**: Select `read` and `trade`
+5. Click **Create**
+6. **IMPORTANT**: Copy and securely save:
+   - ✅ **Client ID**
+   - ✅ **Client Secret** (shown only once!)
 
-3. **OAuth Flow Details**:
-   - Uses production TastyTrade OAuth (sandbox OAuth not available)
-   - Tokens are encrypted and stored in local SQLite database
-   - Automatic token refresh for persistent sessions
-   - Local callback server handles authorization automatically
+**Step 2: Generate Personal Grant**
+
+1. On the OAuth Applications page, click **Manage** next to your application
+2. Click **Create Grant**
+3. **IMPORTANT**: Copy and securely save your **Refresh Token** (shown only once!)
+
+**Step 3: Run Database Setup**
+
+```bash
+tastytrade-mcp setup --mode database
+```
+
+The setup wizard will prompt you for:
+- Client ID (from Step 1)
+- Client Secret (from Step 1)
+- Refresh Token (from Step 2)
+
+**Security Features**:
+- ✅ Tokens encrypted and stored in local SQLite database
+- ✅ Automatic access token refresh (every 15 minutes)
+- ✅ Long-lived refresh token (never expires)
+- ✅ No browser redirects - fully local setup
+
+**Important Security Notes**:
+- ⚠️ Keep Client Secret and Refresh Token safe - they're like passwords
+- ⚠️ Never commit them to git or share publicly
+- ⚠️ If compromised, delete the grant on my.tastytrade.com and create a new one
+- ⚠️ Store them in environment variables or secure password manager
 
 ### **Setup Commands**
 
@@ -251,6 +281,37 @@ python tastytrade_unified_server.py
 "Analyze my AMD put spread strategy with current market conditions"
 ```
 
+### **Streaming Options Quotes**
+
+For real-time streaming of option quotes, use `stream_option_quotes`:
+
+**Important**: This tool takes the underlying symbol and constructs the option symbols for you.
+
+**Correct Usage:**
+```json
+{
+  "symbol": "AAPL",
+  "strikes": "230,235,240",
+  "expiration": "2025-10-17",
+  "option_type": "put"
+}
+```
+
+**Parameters:**
+- `symbol`: Underlying stock symbol (e.g., "AAPL")
+- `strikes`: Comma-separated strike prices (e.g., "230,235,240")
+- `expiration`: Expiration date in YYYY-MM-DD format
+- `option_type`: Either "call" or "put"
+- `duration`: How long to stream in seconds (default: 10)
+
+**Example Questions:**
+```
+"Stream option quotes for AAPL puts at strikes 230, 235, and 240 expiring 2025-10-17"
+"Get real-time quotes for SPY calls at 570, 575, 580 expiring next Friday"
+```
+
+**Note**: Do NOT pass full option symbols like "AAPL  251017P00230000" - the tool constructs these for you.
+
 ### **Market Research**
 
 ```
@@ -294,25 +355,26 @@ If you keep getting "Allow" prompts:
 
 ### **OAuth Setup Issues**
 
-If database mode OAuth setup fails:
+If database mode setup fails:
 
-1. **Browser doesn't open automatically**:
-   - Copy the authorization URL from terminal and open manually
-   - Ensure port 8000 is not blocked by firewall
+1. **"Invalid refresh token" errors**:
+   - Verify you copied the refresh token correctly (no extra spaces)
+   - Ensure the grant hasn't been deleted on my.tastytrade.com
+   - Create a new grant if the refresh token was compromised
 
-2. **"Authorization failed" errors**:
+2. **"Invalid client credentials" errors**:
    - Verify CLIENT_ID and CLIENT_SECRET are correct
-   - Ensure redirect URI is exactly: `http://localhost:8000/callback`
-   - Check that your OAuth app is configured for production (not sandbox)
+   - Ensure no extra spaces when copying credentials
+   - Check that you're using credentials from the same OAuth app
 
-3. **"Timeout" during OAuth flow**:
-   - Complete authorization within 5 minutes
-   - Check internet connection and TastyTrade server status
-   - Try again with fresh OAuth credentials
-
-4. **Database connection errors**:
+3. **Database connection errors**:
    - Ensure write permissions in current directory
    - Try running `tastytrade-mcp clean` and setup again
+
+4. **Token refresh failures**:
+   - Check that CLIENT_SECRET is correctly set in .env file
+   - Verify refresh token hasn't been revoked
+   - Create a new personal grant if needed
 
 ### **WebSocket Connection Issues**
 
@@ -321,11 +383,57 @@ If real-time quotes aren't working:
 - Verify your internet connection
 - Try reducing the duration parameter
 
+## 🚀 Roadmap
+
+### **Future: Full OAuth Flow (Trusted Partner)**
+
+Currently, the MCP server uses **personal grant OAuth** for individual use. We're planning to become a **TastyTrade Trusted Partner** to enable full OAuth flow:
+
+**What this means:**
+- ✅ **One-click setup**: Users can simply click "Connect with TastyTrade"
+- ✅ **No manual token management**: Browser-based OAuth consent screen
+- ✅ **Multi-user support**: Deploy once, serve many users
+- ✅ **Simpler onboarding**: No need to create OAuth apps manually
+
+**Current Status**: Personal grant flow (perfect for open source self-hosted use)
+**Future Goal**: Trusted partner approval for public deployments
+
+If you're interested in helping or have feedback on this roadmap, please open a GitHub issue!
+
+## 📚 Documentation
+
+### **Setup Guides**
+- 📦 [Installation](docs/setup/installation.md) - Complete installation guide
+- 🖥️ [Claude Desktop Setup](docs/setup/claude-desktop.md) - MCP configuration
+- 💬 [ChatGPT Integration](docs/setup/chatgpt.md) - OpenAI setup
+- 🔐 [OAuth Database Mode](docs/setup/oauth-database.md) - Advanced auth
+
+### **Deployment**
+- 🚀 [Deployment Overview](docs/deployment/overview.md) - Cloud deployment guide
+
+### **Development**
+- 🏗️ [Architecture](docs/development/architecture.md) - System design
+- 🤝 [Contributing](docs/development/contributing.md) - Development guide
+- 📝 [Coding Standards](docs/development/coding-standards.md) - Code style
+
+### **API Reference**
+- 🔧 [Handlers](docs/api/handlers.md) - Available MCP tools
+
+### **Supported Instrument Types**
+
+| Type | Sandbox | Production | Notes |
+|------|---------|------------|-------|
+| **Equity (Stocks)** | ✅ | ✅ | Fully tested |
+| **Equity Options** | ✅ | ✅ | Single & multi-leg |
+| **Futures** | ❌ | ⚠️ | Requires special account |
+| **Future Options** | ❌ | ⚠️ | Requires special account |
+| **Cryptocurrency** | ❌ | ❌ | Not yet supported by API |
+
 ## 📞 Support
 
-- **Documentation**: Check the comprehensive guides in `docs/`
+- **Documentation**: See [docs/](docs/) for comprehensive guides
 - **Issues**: Open GitHub issues for bugs or feature requests
-- **Security**: See [SECURITY.md](docs/SECURITY.md) for security policies
+- **Security**: Review our security policies before deployment
 
 ## 📄 License
 

@@ -29,6 +29,8 @@ class BrokerLink(Base):
         nullable=False
     )
     provider: Mapped[str] = mapped_column(String(50), default="tastytrade")
+    account_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    is_sandbox: Mapped[bool] = mapped_column(default=True, nullable=False)
     scope: Mapped[Optional[str]] = mapped_column(Text)
     status: Mapped[LinkStatus] = mapped_column(
         Enum(LinkStatus, native_enum=False, values_callable=lambda obj: [e.value for e in obj]),

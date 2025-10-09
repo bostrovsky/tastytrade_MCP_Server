@@ -6,7 +6,7 @@ from typing import Any
 import mcp.types as types
 from tastytrade import Account
 
-from tastytrade_mcp.handlers.handler_adapter import HandlerAdapter
+from tastytrade_mcp.services.simple_session import get_tastytrade_session
 from tastytrade_mcp.config.settings import get_settings
 from tastytrade_mcp.services.options import (
     StrategyRecognizer,
@@ -17,7 +17,6 @@ from tastytrade_mcp.utils.logging import get_logger
 
 logger = get_logger(__name__)
 settings = get_settings()
-adapter = HandlerAdapter(use_database=settings.use_database_mode)
 
 
 async def handle_analyze_options_strategy(arguments: dict[str, Any]) -> list[types.TextContent]:
@@ -51,7 +50,7 @@ async def handle_analyze_options_strategy(arguments: dict[str, Any]) -> list[typ
 
     try:
         # Get session through adapter
-        session = await adapter.get_session(user_id)
+        session = get_tastytrade_session()
 
         # Check if we need advanced analysis features
         if settings.use_database_mode:
@@ -168,12 +167,15 @@ async def handle_suggest_rebalancing(arguments: dict[str, Any]) -> list[types.Te
         return [types.TextContent(type="text", text="Error: target_allocations parameter is required")]
 
     try:
-        # Get session through adapter
-        session = await adapter.get_session(user_id)
+        # Get session through get_tastytrade_session
+        session = get_tastytrade_session()
 
         # Auto-detect account number if not provided
         if not account_number:
-            account_number = await adapter.get_account_number(user_id)
+            # Get first account if not specified
+            accounts = Account.get(session)
+            if accounts:
+                account_number = accounts[0].account_number
 
         # Check if we need advanced rebalancing features
         if settings.use_database_mode:
