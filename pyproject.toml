@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tastytrade-mcp"
-version = "1.4.2"
+version = "1.4.3"
 description = "TastyTrade MCP Server - Production-ready OAuth trading with full instrument support"
 readme = "README.md"
 license = {text = "MIT"}
