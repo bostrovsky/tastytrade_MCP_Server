@@ -1,5 +1,5 @@
 """TastyTrade MCP Server package."""
 
-__version__ = "1.2.16"
+__version__ = "1.4.0"
 __author__ = "TastyTrade MCP Team"
 __license__ = "MIT"
